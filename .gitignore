@@ -6,6 +6,7 @@ node_modules/
 .venv/
 __pycache__/
 results/*.csv
+results/*.meta.json
 *.egg-info/
 .pytest_cache/
 lab/run.*

@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from pqdl import sidecar
 from pqdl.drift import pqc_contrast_table
 from pqdl.features import PQC_DRIFT_FEATURES
 from pqdl.loaders import SOURCE_PQC, assert_single_source, load_pqc_oav
@@ -31,4 +32,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sidecar.tracked(main, Path(__file__).resolve().parents[1], __file__))

@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from pqdl import sidecar
 from pqdl.canon import AUTH_MAP, measured_o_cert
 from pqdl.profiles import SIZES
 
@@ -68,4 +69,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sidecar.tracked(main, ROOT, __file__))

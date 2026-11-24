@@ -18,6 +18,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 import canon_eval as ce
+from pqdl import sidecar
 from pqdl import canon
 from pqdl import detectors as dt
 from pqdl import stats as st
@@ -481,4 +482,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(sidecar.tracked(main, ROOT, __file__, sys.argv[1:]))

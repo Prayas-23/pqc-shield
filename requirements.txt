@@ -8,5 +8,6 @@ torch
 scapy
 fastapi
 uvicorn
+websockets
 httpx
 pytest

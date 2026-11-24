@@ -23,7 +23,8 @@ def client(tmp_path_factory) -> TestClient:
 
 def check_provenance(body: dict, synthetic: bool) -> None:
     p = body["provenance"]
-    assert set(p) == {"data_source", "synthetic", "code_commit", "generated_at", "source_files"}
+    assert set(p) == {"data_source", "synthetic", "results_code_commit", "served_by_commit", "results_files",
+                      "generated_at", "source_files"}
     assert p["synthetic"] is synthetic
     assert p["data_source"] == ("SYNTHETIC_TEST_FIXTURE" if synthetic else "lab_captures")
     assert isinstance(p["source_files"], list) and p["source_files"]
@@ -200,7 +201,8 @@ def real() -> TestClient:
 def test_real_meta(real):
     b = real.get("/api/meta").json()
     check_provenance(b, False)
-    assert len(b["profiles"]) == 18 and b["provenance"]["code_commit"] != "unknown"
+    assert len(b["profiles"]) == 18 and b["provenance"]["served_by_commit"] != "unknown"
+    assert isinstance(b["provenance"]["results_code_commit"], str) and b["served_by_commit"] == b["provenance"]["served_by_commit"]
 
 
 @pytest.mark.realdata
@@ -243,3 +245,53 @@ def test_real_stream(real):
     assert msgs[0]["replay"] is True and "REPLAY" in msgs[0]["notice"]
     check_provenance(msgs[0], False)
     assert msgs[-1]["type"] == "done" and msgs[-1]["n_flows"] == 40
+
+
+# ---------------------------------------------------------------------------------------------- sidecar provenance (SYNTHETIC)
+def write_meta(csv: Path, commit: str, when: str = "2026-01-02T03:04:05+00:00") -> None:
+    import json
+    csv.with_suffix(".meta.json").write_text(json.dumps({"code_commit": commit, "generated_at": when, "script": "scripts/x.py"}))
+
+
+def test_results_commit_unknown_when_no_sidecar_and_served_by_is_head(client):
+    p = client.get("/api/detectors", params={"detector": "rf"}).json()["provenance"]
+    assert p["results_code_commit"] == "unknown (generated before tracking)"
+    assert all(v is None for v in p["results_files"].values())
+
+
+def test_results_commit_from_sidecars_and_mixed(tmp_path):
+    cfg = fx.build(tmp_path)
+    write_meta(cfg.results_dir / "detector_baseline.csv", "aaa111-dirty", "2026-01-02T03:04:05+00:00")
+    write_meta(cfg.results_dir / "canon_eval.csv", "aaa111-dirty", "2026-01-03T00:00:00+00:00")
+    c = TestClient(create_app(cfg))
+    p = c.get("/api/pqmix", params={"pi": 0.5, "detector": "rf", "profile": fx.P1}).json()["provenance"]
+    assert p["results_code_commit"] == "aaa111-dirty"
+    assert p["generated_at"] == "2026-01-03T00:00:00+00:00"                     # newest sidecar time
+    assert p["results_files"]["SYNTHETIC_results/detector_baseline.csv"] == {
+        "code_commit": "aaa111-dirty", "generated_at": "2026-01-02T03:04:05+00:00", "script": "scripts/x.py"}
+    write_meta(cfg.results_dir / "canon_eval.csv", "bbb222")
+    p = TestClient(create_app(cfg)).get("/api/pqmix", params={"pi": 0.5, "detector": "rf", "profile": fx.P1}).json()["provenance"]
+    assert p["results_code_commit"] == "mixed (see results_files)"
+    # one file with a sidecar, one without -> mixed (not silently taken from the one that has it)
+    (cfg.results_dir / "canon_eval.meta.json").unlink()
+    p = TestClient(create_app(cfg)).get("/api/pqmix", params={"pi": 0.5, "detector": "rf", "profile": fx.P1}).json()["provenance"]
+    assert p["results_code_commit"] == "mixed (see results_files)"
+
+
+def test_malformed_sidecar_is_treated_as_missing(tmp_path):
+    cfg = fx.build(tmp_path)
+    (cfg.results_dir / "lab_drift.meta.json").write_text("{not json")
+    p = TestClient(create_app(cfg)).get("/api/drift").json()["provenance"]
+    assert p["results_code_commit"] == "unknown (generated before tracking)"
+    (cfg.results_dir / "lab_drift.meta.json").write_text('{"code_commit": "x"}')                  # missing keys
+    assert TestClient(create_app(cfg)).get("/api/drift").json()["provenance"]["results_files"]["SYNTHETIC_results/lab_drift.csv"] is None
+
+
+def test_served_by_commit_is_head_of_the_served_repo(tmp_path):
+    cfg = fx.build(tmp_path)
+    git = cfg.root / ".git"
+    (git / "refs" / "heads").mkdir(parents=True)
+    (git / "HEAD").write_text("ref: refs/heads/main")
+    (git / "refs" / "heads" / "main").write_text("cafe1234")
+    p = TestClient(create_app(cfg)).get("/api/drift").json()["provenance"]
+    assert p["served_by_commit"] == "cafe1234" and p["results_code_commit"] == "unknown (generated before tracking)"

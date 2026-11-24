@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from pqdl import sidecar
 from pqdl import rep_timing as rt
 from pqdl.labplan import REPLICATE_PROFILES, REPLICATE_WORKLOADS
 
@@ -183,4 +184,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sidecar.tracked(main, ROOT, __file__))

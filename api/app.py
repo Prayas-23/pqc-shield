@@ -76,7 +76,7 @@ def create_app(cfg: ApiConfig | None = None) -> FastAPI:
     @app.get("/api/meta")
     def meta() -> dict:
         base, can = store.csv(BASE_CSV), store.csv(CANON_CSV)
-        return out({"version": pqdl.__version__, "code_commit": provenance(cfg, [])["code_commit"],
+        return out({"version": pqdl.__version__, "served_by_commit": provenance(cfg, [])["served_by_commit"],
                     "profiles": store.profile_strings(),
                     "methods": {"baseline": sorted(base["method"].unique()), "canon": sorted(can["method"].unique()),
                                 "stream": list(STREAM_METHODS)},

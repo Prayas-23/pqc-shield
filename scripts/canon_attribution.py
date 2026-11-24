@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from pqdl import sidecar
 from pqdl import detectors as dt
 from pqdl.canon import CLASSICAL_CONTEXT, GROUPS, group_features, handshake_delta
 from pqdl.loaders import assert_single_source
@@ -100,4 +101,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sidecar.tracked(main, ROOT, __file__))

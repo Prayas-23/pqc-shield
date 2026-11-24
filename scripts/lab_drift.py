@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from pqdl import sidecar
 from pqdl.lab_drift import LabDriftResult, run_lab_drift
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,4 +70,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sidecar.tracked(main, ROOT, __file__))

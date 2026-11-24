@@ -12,26 +12,32 @@ Needs the stored files produced by the pipeline scripts: `data/flows/lab_flows.c
 `detector_baseline.csv`, `canon_eval.csv`, `stats_pcap_level.csv`. A missing results file gives `503` with a message.
 `stats_pcap_level.csv` is optional (the `pcap_level` field is then `null`).
 
-**WebSocket needs a library.** `uvicorn` serves WebSocket routes only if `websockets` (or `wsproto`) is installed. Neither is
-in `requirements.txt` yet; adding one is a new dependency and needs approval (rule 8). Without it `/api/stream` cannot be
-served by the live server (the HTTP routes are unaffected). The TestClient tests do not need it.
+**WebSocket.** `/api/stream` is served by uvicorn through the `websockets` library (in `requirements.txt`).
 
 ## Provenance block (every response)
 
 ```json
-"provenance": {"data_source": "lab_captures", "synthetic": false, "code_commit": "<git HEAD sha>",
-               "generated_at": "<newest mtime of the source files, UTC>", "source_files": ["results/..."]}
+"provenance": {"data_source": "lab_captures", "synthetic": false,
+               "results_code_commit": "<commit that produced the results, from the sidecar>",
+               "served_by_commit": "<git HEAD sha of the repository serving the request>",
+               "results_files": {"results/detector_baseline.csv": {"code_commit": "...", "generated_at": "...", "script": "..."}},
+               "generated_at": "<newest sidecar time, else newest file mtime, UTC>", "source_files": ["results/..."]}
 ```
 
-`code_commit` is read from `.git` (no subprocess) and is the repository HEAD when the request is served; it is not
-recorded inside the results files. Test-only responses from the SYNTHETIC fixture say
-`"data_source": "SYNTHETIC_TEST_FIXTURE", "synthetic": true`.
+* `results_code_commit` comes from the sidecar `results/<name>.meta.json` that every analysis script writes
+  (`{code_commit, generated_at, script}`; `-dirty` is appended if the working tree had changes when the script started;
+  see `pqdl.sidecar.tracked`). A source file with no sidecar (everything produced before tracking existed, and the lab flows
+  file) counts as unknown: if no source file has one the value is `"unknown (generated before tracking)"`; if all agree it
+  is that commit; otherwise `"mixed (see results_files)"`. Sidecars are never created by the API and were not back-filled.
+* `served_by_commit` is read from `.git` (no subprocess); it says which code served the response, not which code made the
+  results.
+* Test-only responses from the SYNTHETIC fixture say `"data_source": "SYNTHETIC_TEST_FIXTURE", "synthetic": true`.
 
 ## Routes
 
 | Route | Parameters | Returns |
 |---|---|---|
-| `GET /api/meta` | none | `version`, `code_commit`, `profiles` (18 lab profiles `kem\|auth\|chain`), `methods` (baseline, canon, stream), `detectors`, `caveats` |
+| `GET /api/meta` | none | `version`, `served_by_commit`, `profiles` (18 lab profiles `kem\|auth\|chain`), `methods` (baseline, canon, stream), `detectors`, `caveats` |
 | `GET /api/ladder` | `kem`, `auth`, `chain` (required) | `model.ladder` = `handshake_ladder()` at `LAB_MSS = 1448`, `model.B_S/B_C`, `observed` (median `hs_s2c_bytes`/`hs_c2s_bytes`, `n_flows`), `comparison` (observed, model, difference, % of observed). 404 for an unknown profile |
 | `GET /api/drift` | `workload`, `view` (`hs`\|`app`\|`flow`), `limit`, `offset` | rows of `lab_drift.csv`: `eta2`, `partial_eta2`, `psi`, `mmd2`, `mmd2_p_value`, with the noise floors `noise95_eta2`, `noise95_max_psi` |
 | `GET /api/detectors` | `detector` (`rf`\|`ae`\|`iforest`), `method`, `profile`, `dataset` (default `main`), `metric`, `limit` | one record per (dataset, detector, method, profile) with `metrics{fpr,tpr_all,tpr_*,auroc,...}` each `{value, ci_lo, ci_hi, seed_sd}`; `pcap_level` (mean FPR and SD across the 4 capture sets, min, max, whether the flow CI understates) only where it exists (4 replicated profiles, 8 methods) |

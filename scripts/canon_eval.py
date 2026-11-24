@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from pqdl import sidecar
 from pqdl import canon
 from pqdl import detectors as dt
 from pqdl.features import CONTEXT_FEATURES
@@ -307,4 +308,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(sidecar.tracked(main, ROOT, __file__, sys.argv[1:]))
