@@ -118,6 +118,23 @@ time-blocked splits inside one pcap; the c-hat/bank/threshold are fitted on the 
 (different time blocks) except in the replicate confirmation; bootstrap CIs resample flows and ignore pcap-level
 variance; conformal coverage is only claimed for exchangeable calibration/test flows.
 
+## 10. Attribution result and frozen corrected set (added after the section 8 run; train/validation blocks only)
+
+`scripts/canon_attribution.py` was run exactly as pre-registered in section 8 (output: `docs/canon_attribution.md`,
+`results/canon_attribution.csv`). Median FPR of the naive detector on the 17 other profiles' benign validation flows:
+all features RF 1.000 / AE 1.000 / IForest 0.150; leaving out **bytes**: RF 0.000, AE 0.093; leaving out pkts, pktlen
+or time: unchanged (RF and AE 1.000); bytes alone: 1.000 for RF and AE. Verdict by the fixed rule: **the only driver is
+the `bytes` group** (flow_c2s_bytes, flow_s2c_bytes). pkts, pktlen and time are not drivers.
+
+Frozen consequence for the design: **CANON-A corrects `bytes` only; CANON-B residualises `flow_c2s_bytes` and
+`flow_s2c_bytes` only.** The pkts and pktlen-mean corrections of section 4 are therefore NOT applied (the code keeps
+them available but the evaluation uses groups = ["bytes"]). Descriptive check, not tuned: model-predicted vs observed
+validation-median byte deltas agree to about 34 B for the `leaf_int` profiles and are off by 170-370 B for the
+`leaf` profiles (default o_cert 40 B vs the real per-certificate framing, n_certs differs from the reference);
+observed packet-count deltas on the client side equal the server side (ACKs) while the model predicts 1, which is
+one more reason not to correct packet counts.
+
 ## Change log
 
-(none yet)
+- 2026-11-24: section 10 added after the pre-registered attribution run (validation blocks only; no CANON test-block
+  result existed). The previous "(none yet)" line was replaced by this entry.
