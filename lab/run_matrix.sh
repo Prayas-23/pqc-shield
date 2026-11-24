@@ -26,11 +26,12 @@ cd "$(dirname "$0")/.."
 # shellcheck source=profiles.sh
 source lab/profiles.sh
 
-MODE=""; N_OVERRIDE=""; SEED=1234; ORDER_SEED=20261124; PLAN=""; MIN_FREE_GB=20; MAX_ATTEMPTS=3; MAX_OFFLOAD_PAYLOAD=1460
+MODE=""; N_OVERRIDE=""; SEED=1234; ORDER_SEED=20261124; PLAN=""; LIMIT=""; MIN_FREE_GB=20; MAX_ATTEMPTS=3; MAX_OFFLOAD_PAYLOAD=1460
 while [ $# -gt 0 ]; do
   case "$1" in
     --mini) MODE=mini ;; --full) MODE=full ;; --rep) MODE=rep ;; --plan) PLAN=1 ;;
     --n) N_OVERRIDE="$2"; shift ;; --seed) SEED="$2"; shift ;; --order-seed) ORDER_SEED="$2"; shift ;;
+    --limit) LIMIT="$2"; shift ;;   # testing aid: only the first K jobs (captures are real; delete them afterwards)
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -70,7 +71,7 @@ n_for() { # WORKLOAD -> sessions (--rep uses the same counts as the main run)
 JOBS=()   # "run_order kem auth chain replicate workload"; replicate is "-" outside --rep
 if [ "$MODE" = rep ]; then
   while read -r ro kem auth chain r wl; do JOBS+=("$ro $kem $auth $chain $r $wl"); done \
-    < <("$PY" scripts/capture_order.py --seed "$ORDER_SEED")
+    < <("$PY" scripts/capture_order.py --seed "$ORDER_SEED" | tr -d '\r')
 else
   PROFILES=()   # "kem auth chain"
   if [ "$MODE" = mini ]; then
@@ -85,6 +86,7 @@ else
     for wl in "${WORKLOADS[@]}"; do k=$((k + 1)); JOBS+=("$k $kem $auth $chain - $wl"); done
   done
 fi
+[ -z "$LIMIT" ] || JOBS=("${JOBS[@]:0:$LIMIT}")
 if [ -n "$PLAN" ]; then
   echo "mode=$MODE seed=$SEED order_seed=$ORDER_SEED jobs=${#JOBS[@]}"
   printf '%s\n' "${JOBS[@]}"

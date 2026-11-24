@@ -11,6 +11,7 @@ from pqdl.labplan import replicate_order
 
 
 def main(argv: list[str]) -> None:
+    sys.stdout.reconfigure(newline=chr(10))   # plain LF even on Windows: the shell must not see a trailing CR
     seed = int(argv[argv.index("--seed") + 1]) if "--seed" in argv else 0
     for run_order, kem, auth, chain, replicate, workload in replicate_order(seed):
         print(run_order, kem, auth, chain, replicate, workload)
