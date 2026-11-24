@@ -345,6 +345,13 @@ def write_notes(cov_s, fr, diffs, mc, pc, claims, old_cov, n_draws) -> str:
          "threshold hit alpha; the realised FPR itself varies from draw to draw (SD in the table), and for n = 50 the mean is "
          "also below alpha (1/(n+1)-type slack). So 'alpha outside the CI' happens often even for a valid procedure, "
          "and 'alpha inside the CI' can happen by chance for an invalid one. The earlier table is kept below for reference.", "",
+         "**Why the empirical SD over draws is below the theoretical SD.** The draws are subsets of the SAME 120 benign "
+         "validation flows (sampling without replacement from a finite pool; k = 100 or 120 of 120 overlap almost completely, "
+         "and for k = 120 only the split into fit/threshold halves changes). Re-drawing from a fixed pool therefore captures "
+         "much less variation than collecting NEW calibration flows would, which is what the Beta spread describes. The "
+         "measured SD is a lower bound on the real calibration randomness, not an estimate of it; the 'share of draws ok' "
+         "column is correspondingly optimistic. RF has FPR 0 in every draw (tied scores), so its SD is 0 and it is valid "
+         "but vacuous (mean FPR far below the 0.05 target).", "",
          "**Exchangeability.** Calibration flows come from the validation block and test flows from the later test block "
          "of the same pcap; the time-blocked split therefore slightly violates exchangeability (drift inside a capture), "
          "so the theory is an approximation. Also the test block is fixed, so the SD over draws excludes test-sampling "
