@@ -26,8 +26,8 @@ PORT = 9333
 CHROME_CANDIDATES = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
                      r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
 # (file stem, url, wait seconds before the picture)
-SCREENS = [("1-ladder", "/#ladder", 3), ("2-drift", "/#drift", 4), ("3-detectors", "/#detectors", 6),
-           ("4-replay", "/?autostart=1#replay", 9), ("5-caveats", "/#caveats", 2)]
+SCREENS = [("1-ladder", "/#ladder", 5.5), ("2-drift", "/#drift", 4), ("3-detectors", "/#detectors", 6),
+           ("4-replay", "/?autostart=1#replay", 4), ("5-caveats", "/#caveats", 2)]
 
 
 class Cdp:
@@ -87,7 +87,7 @@ def shoot(cdp: Cdp, url: str, width: int, height: int, wait: float, path: Path, 
 
 SET_APP_VIEW = """(() => { const s = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.value === 'app'));
   Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'app'); s.dispatchEvent(new Event('change', {bubbles: true})); })()"""
-OPEN_HELP = "document.querySelector('.strip button').click()"
+OPEN_HELP = "document.querySelector('.titlebar button').click()"
 
 
 def main() -> int:
@@ -99,9 +99,11 @@ def main() -> int:
         for stem, url, wait in SCREENS:
             shoot(cdp, url, 1280, 800, wait, OUT / f"{stem}-1280x800.png")
             shoot(cdp, url, 390, 844, wait, OUT / f"{stem}-phone-390x844.png")
-        shoot(cdp, "/#ladder", 1280, 800, 3, OUT / "1-ladder-measured-overhead-1280x800.png", script="document.querySelector('input[type=checkbox]').click()")
+        shoot(cdp, "/#ladder", 1280, 800, 2, OUT / "1-ladder-measured-overhead-1280x800.png", script="document.querySelector('input[type=checkbox]').click()")
         shoot(cdp, "/#drift", 1280, 800, 4, OUT / "2-drift-application-view-1280x800.png", script=SET_APP_VIEW)
         shoot(cdp, "/#detectors", 1280, 800, 6, OUT / "3-detectors-help-open-1280x800.png", script=OPEN_HELP)
+        shoot(cdp, "/#drift", 1280, 800, 0.12, OUT / "2-drift-loading-1280x800.png")
+        shoot(cdp, "/#replay", 1280, 800, 1.5, OUT / "4-replay-idle-1280x800.png")
     finally:
         chrome.terminate()
     return 0

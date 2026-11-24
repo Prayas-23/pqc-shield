@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { streamUrl } from "../lib/api";
 import type { Meta, StreamDone, StreamFlow, StreamHello, StreamMessage } from "../lib/types";
-import { rate, shortProfile } from "../lib/mappers";
+import { barScale, rate, rollingAlertRate, shortProfile } from "../lib/mappers";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
-import { Select, ViewFrame } from "./Common";
+import { Select, SkelRows, ViewFrame } from "./Common";
 
 interface Feed {
   hello: StreamHello | null; recent: StreamFlow[]; done: StreamDone | null; error: string | null; open: boolean;
@@ -24,6 +24,22 @@ function add(f: Feed, m: StreamMessage): Feed {
     benign: f.benign + (m.label === "benign" ? 1 : 0), attack: f.attack + (m.label === "attack" ? 1 : 0),
     falseAlarms: f.falseAlarms + (m.label === "benign" && m.alert ? 1 : 0), detections: f.detections + (m.label === "attack" && m.alert ? 1 : 0),
   };
+}
+
+/** Rolling alert rate of the latest flows (shape only; the counters carry the exact numbers). */
+function Spark({ flows }: { flows: StreamFlow[] }) {
+  const pts = rollingAlertRate(flows, 12, 90);
+  if (pts.length < 2) return <svg className="spark" aria-hidden="true"><line className="base" x1="0" x2="100%" y1="30" y2="30" /></svg>;
+  const x = (i: number) => (i / (pts.length - 1)) * 100;
+  const y = (v: number) => 30 - v * 26;
+  const line = pts.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  return (
+    <svg className="spark" viewBox="0 0 100 34" preserveAspectRatio="none" role="img" aria-label="rolling alert rate of the latest flows">
+      <line className="base" x1="0" x2="100" y1="30" y2="30" vectorEffect="non-scaling-stroke" />
+      <polygon className="area" points={`0,30 ${line} 100,30`} />
+      <polyline className="line" points={line} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
 }
 
 export function ReplayView({ meta }: { meta: Meta }) {
@@ -74,7 +90,7 @@ export function ReplayView({ meta }: { meta: Meta }) {
         <input type="range" min={5} max={300} step={5} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="replay speed, flows per second" />
       </label>
       <div className="btnrow">
-        <button type="button" className="btn" onClick={start} disabled={running}>start</button>
+        <button type="button" className="btn primary" onClick={start} disabled={running}>start</button>
         <button type="button" className="btn" onClick={stop} disabled={!running}>stop</button>
       </div>
       <div className="dim">The same recorded flows go through both detectors, so rows line up. Speed is flows per second, not recorded time.</div>
@@ -84,39 +100,62 @@ export function ReplayView({ meta }: { meta: Meta }) {
   const help = (
     <>
       <p>The test-block flows of one profile are sent through a detector trained once on the classical training block, in recorded start-time order. A flag on a benign flow is a false alarm; a flag on an attack flow is a detection. The attacks are scripted attack-like workloads, not real attacks.</p>
-      <p>The counters cover every flow received; the table keeps the latest rows, newest first. The CANON-B pane uses the true context of the profile (the context estimator is exact in this lab).</p>
+      <p>On each row the bar is the detector score and the white tick is the decision threshold; the bar turns red-orange when the score exceeds it. The counters cover every flow received; the table keeps the latest rows, newest first. The sparkline is the rolling alert rate of the latest flows. The CANON-B pane uses the true context of the profile (the context estimator is exact in this lab).</p>
     </>
   );
 
   return (
     <ViewFrame title="Replay" help={help} controls={controls} prov={hello?.provenance} status={<span>{shortProfile(profile)} · {detector}</span>}>
-      <div className="banner">Replay of recorded lab captures, not live traffic.
-        <span>{hello ? hello.notice.split(". ").slice(1).join(". ") : "Read from stored flows; nothing is captured."}</span></div>
+      <div className="banner">
+        <i className={`dot-live ${running ? "on" : ""}`} style={{ background: running ? "var(--amber)" : "var(--faint)", boxShadow: running ? "0 0 8px var(--amber)" : "none" }} />
+        Replay of recorded lab captures, not live traffic.
+        <span className="rest">{hello ? hello.notice.split(". ").slice(1).join(". ") : "Read from stored flows; nothing is captured."}</span>
+      </div>
       <div className="cols2">
         {PANES.map(({ method, title, text }) => {
           const f = feeds[method]!;
           const fa = rate(f.falseAlarms, f.benign), dr = rate(f.detections, f.attack);
+          const scale = barScale(f.recent);
+          const state = f.open ? "streaming" : f.done ? `finished, ${fmtInt(f.done.n_flows)} flows` : "idle";
           return (
             <section className="pane" key={method}>
-              <div className="strip"><b>{title}</b><span>{text}</span><span className="grow" /><span>{f.open ? "streaming" : f.done ? `finished, ${fmtInt(f.done.n_flows)} flows` : "idle"}</span></div>
-              <div className="counts">
-                <div className="alert">false alarms <b>{fmtInt(f.falseAlarms)}</b>/{fmtInt(f.benign)} ({fa === null ? "n/a" : fmtPct(fa)})</div>
-                <div>detections <b>{fmtInt(f.detections)}</b>/{fmtInt(f.attack)} ({dr === null ? "n/a" : fmtPct(dr)})</div>
+              <div className="phead"><b>{title}</b><span>{text}</span><span className="grow" /><span><i className={`dot-live ${f.open ? "on" : ""}`} style={f.open ? undefined : { background: "var(--faint)" }} />{state}</span></div>
+              <div className="hero">
+                <div>
+                  <div className="big" style={{ color: f.falseAlarms > 0 ? "var(--alert)" : "var(--teal)" }}>{fmtInt(f.falseAlarms)}<small>false alarms</small></div>
+                  <div className="bl">of {fmtInt(f.benign)} benign flows ({fa === null ? "n/a" : fmtPct(fa)})</div>
+                </div>
+                <div className="side2">
+                  <span><b>{fmtInt(f.detections)}</b> detections of {fmtInt(f.attack)} attack flows ({dr === null ? "n/a" : fmtPct(dr)})</span>
+                  <Spark flows={f.recent} />
+                  <span>rolling alert rate, latest flows</span>
+                </div>
               </div>
               {f.error ? <div className="err" role="alert">{f.error}</div> : null}
               <div className="ftable" role="log" aria-label={`${title} flows`}>
-                <div className="frow head"><span className="num">#</span><span>workload</span><span>class</span><span className="num">score</span><span className="num thr">thr.</span><span>decision</span></div>
-                {f.recent.length === 0 ? <div className="msg" style={{ padding: "0.4rem 0.6rem" }}>no flows yet</div> : null}
-                {f.recent.map((r) => (
-                  <div className="frow" key={r.index} title={`flow ${r.index}, ${r.workload} (${r.label})`}>
-                    <span className="num">{fmtInt(r.index)}</span>
-                    <span>{r.workload}</span>
-                    <span className="dim">{r.label}</span>
-                    <span className="num">{fmtNum(r.score, 4)}</span>
-                    <span className="num thr dim">{fmtNum(r.threshold, 4)}</span>
-                    <span className={r.alert ? (r.label === "benign" ? "alert" : "hit") : "dim"}>{r.alert ? (r.label === "benign" ? "false alarm" : "detected") : "-"}</span>
+                <div className="frow head"><span className="num">#</span><span>workload</span><span className="cls">class</span><span>score</span><span>decision</span></div>
+                {f.recent.length === 0 ? (
+                  <div style={{ padding: "0.6rem 0.8rem" }}>
+                    <div className="empty">{running ? "Waiting for the first flows ..." : "Press start to stream the recorded flows through this detector."}</div>
+                    <SkelRows n={7} />
                   </div>
-                ))}
+                ) : null}
+                {f.recent.map((r) => {
+                  const over = r.score > r.threshold;
+                  const cls = r.alert ? (r.label === "benign" ? "alert" : "hit") : "";
+                  return (
+                    <div className={`frow ${cls}`} key={r.index} title={`flow ${r.index}, ${r.workload} (${r.label}): score ${fmtNum(r.score, 4)}, threshold ${fmtNum(r.threshold, 4)}`}>
+                      <span className="num">{fmtInt(r.index)}</span>
+                      <span>{r.workload}</span>
+                      <span className="dim cls">{r.label}</span>
+                      <span className="sbn">
+                        <span className="sb"><i className={`fill${over ? " over" : ""}`} style={{ width: `${Math.min((r.score / scale) * 100, 100)}%` }} /><i className="thr" style={{ left: `${Math.min((r.threshold / scale) * 100, 100)}%` }} /></span>
+                        <span>{fmtNum(r.score, 3)}</span>
+                      </span>
+                      <span className={r.alert ? (r.label === "benign" ? "dec-fa" : "dec-hit") : "dim"}>{r.alert ? (r.label === "benign" ? "false alarm" : "detected") : "-"}</span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           );

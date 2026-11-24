@@ -169,3 +169,28 @@ export function shortProfile(p: string): string {
 
 /** "flow_c2s_bytes" -> "c2s_bytes": the view prefix is already named by the selector. */
 export const shortFeature = (f: string): string => f.replace(/^(flow|app|hs)_/, "");
+
+// ------------------------------------------------------------------ visual scales (drawing helpers, not data)
+/** Arrow thickness in px for a message of `bytes`: linear in bytes, so a large flight visibly dwarfs a small one. */
+export const arrowThickness = (bytes: number): number => Math.min(1.5 + Math.max(bytes, 0) / 1000, 16);
+
+/** Mixed rate for a PQ share `pi`: pi * FPR(PQ profile) + (1 - pi) * FPR(classical). Same formula the API states. */
+export const mixAt = (pi: number, fprProfile: number, fprClassical: number): number => pi * fprProfile + (1 - pi) * fprClassical;
+
+/** Rolling alert rate over the flows, oldest first. `newestFirst` is the feed order; the window is in flows. */
+export function rollingAlertRate(newestFirst: StreamFlow[], window: number, maxPoints: number): number[] {
+  const flows = newestFirst.slice(0, maxPoints + window).reverse();
+  const out: number[] = [];
+  for (let i = 0; i < flows.length; i++) {
+    const w = flows.slice(Math.max(0, i - window + 1), i + 1);
+    out.push(w.filter((f) => f.alert).length / w.length);
+  }
+  return out.slice(-maxPoints);
+}
+
+/** Upper end of the score bars: the largest score or threshold seen, so the threshold tick stays on the track. */
+export function barScale(flows: StreamFlow[]): number {
+  let m = 0;
+  for (const f of flows) m = Math.max(m, f.score, f.threshold);
+  return m > 0 ? m : 1;
+}

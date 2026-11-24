@@ -1,7 +1,7 @@
 // SYNTHETIC fixtures only: the numbers below are invented to check the arithmetic of the mappers, never quoted anywhere.
 import { describe, expect, it } from "vitest";
 import {
-  caveatTags, cellKey, driftMatrix, fprBars, heatSummary, labelRow, shortFeature, shortProfile, intensity, ladderDelta, metricsForView, mixLines, parseProfile,
+  caveatTags, cellKey, driftMatrix, fprBars, heatSummary, labelRow, shortFeature, shortProfile, arrowThickness, mixAt, rollingAlertRate, barScale, intensity, ladderDelta, metricsForView, mixLines, parseProfile,
   profileOptions, rate, replayCounters, sequenceSteps,
 } from "./mappers";
 import { fmtBytes, fmtInt, fmtPct, fmtSigned, shortSha } from "./format";
@@ -164,5 +164,26 @@ describe("short labels", () => {
     expect(shortFeature("app_s2c_size_3")).toBe("s2c_size_3");
     expect(shortFeature("hs_duration")).toBe("duration");
     expect(shortFeature("plain")).toBe("plain");
+  });
+});
+
+describe("visual scales", () => {
+  const fl = (alert: boolean, score = 0, threshold = 0): StreamFlow => ({ type: "flow", replay: true, index: 0, recorded_offset_s: 0, workload: "w", label: "benign", score, threshold, alert, flow_s2c_bytes: 0, flow_c2s_bytes: 0 });
+  it("makes arrow thickness linear in bytes with a floor and a cap", () => {
+    expect(arrowThickness(0)).toBeCloseTo(1.5);
+    expect(arrowThickness(15000) / arrowThickness(1400)).toBeGreaterThan(4);
+    expect(arrowThickness(1e9)).toBe(16);
+  });
+  it("computes the mixed rate as the stated weighted average", () => {
+    expect(mixAt(0.25, 0.9, 0.02)).toBeCloseTo(0.24);
+    expect(mixAt(0, 0.9, 0.02)).toBeCloseTo(0.02);
+    expect(mixAt(1, 0.9, 0.02)).toBeCloseTo(0.9);
+  });
+  it("rolls the alert rate oldest first and scales score bars to the largest value", () => {
+    const feed = [fl(true), fl(true), fl(false), fl(false)];            // newest first
+    expect(rollingAlertRate(feed, 2, 10)).toEqual([0, 0, 0.5, 1]);
+    expect(rollingAlertRate(feed, 2, 2)).toEqual([0.5, 1]);
+    expect(barScale([fl(false, 0.2, 0.5), fl(true, 0.8, 0.5)])).toBe(0.8);
+    expect(barScale([])).toBe(1);
   });
 });

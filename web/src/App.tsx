@@ -3,7 +3,7 @@ import { useApi } from "./lib/api";
 import type { Meta } from "./lib/types";
 import { Rail, StatusBar, TopBar, VIEWS } from "./components/Shell";
 import type { ViewId } from "./components/Shell";
-import { Msg, Source } from "./components/Common";
+import { Msg, Source, SkelRows } from "./components/Common";
 import { LadderView } from "./components/Ladder";
 import { DriftView } from "./components/Drift";
 import { DetectorsView } from "./components/Detectors";
@@ -40,7 +40,7 @@ export default function App() {
       <div className="mid">
         <Rail view={view} onPick={go} />
         <main style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          {meta.error || meta.loading ? <div style={{ padding: "0.8rem" }}><Msg loading={meta.loading} error={meta.error} what="/api/meta" /></div> : null}
+          {meta.error || meta.loading ? <div style={{ padding: "0.8rem" }}><Msg loading={meta.loading} error={meta.error} what="/api/meta" fallback={<SkelRows n={9} />} /></div> : null}
           {m && view === "ladder" ? <LadderView meta={m} /> : null}
           {m && view === "drift" ? <DriftView /> : null}
           {m && view === "detectors" ? <DetectorsView meta={m} /> : null}
@@ -48,7 +48,7 @@ export default function App() {
           {m && view === "caveats" ? (
             <div className="view" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
               <section className="workspace" style={{ borderRight: 0 }} aria-label="Caveats">
-                <div className="strip"><b>Caveats</b></div>
+                <div className="titlebar"><h1>Caveats</h1></div>
                 <div className="wbody plain">
                   <ul>{m.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
                   <Source prov={m.provenance} />

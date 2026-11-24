@@ -1,7 +1,6 @@
 import type { ApiState } from "../lib/api";
-import type { Meta } from "../lib/types";
+import type { Meta, Provenance } from "../lib/types";
 import { commitLabel, shortSha } from "../lib/format";
-import type { Provenance } from "../lib/types";
 
 /** Hover text: the commit recorded for each source file ("unknown" where the file has no sidecar). */
 export const commitTitle = (p: Provenance): string =>
@@ -32,7 +31,6 @@ export function TopBar({ meta }: { meta: ApiState<Meta> }) {
 export function Rail({ view, onPick }: { view: ViewId; onPick: (v: ViewId) => void }) {
   return (
     <nav className="rail" aria-label="views">
-      <div className="strip"><b>views</b></div>
       {VIEWS.map(([id, label], i) => (
         <button key={id} type="button" className={view === id ? "tab on" : "tab"} onClick={() => onPick(id)} aria-current={view === id ? "page" : undefined}>
           <kbd>{i + 1}</kbd><span>{label}</span>
@@ -48,7 +46,7 @@ export function StatusBar({ meta, onCaveats }: { meta: ApiState<Meta>; onCaveats
   const state = meta.error ? "not reachable" : meta.loading ? "connecting" : "connected";
   return (
     <footer className="status">
-      <span>api: <span className={meta.error ? "sig" : ""} style={meta.error ? undefined : { color: "var(--ink)" }}>{state}</span></span>
+      <span><i className={`dot-live ${meta.error ? "err" : meta.loading ? "" : "on"}`} />api: <span style={{ color: meta.error ? "var(--alert)" : "var(--ink)" }}>{state}</span></span>
       {p ? <span>served by: {shortSha(p.served_by_commit)}</span> : null}
       {p ? <span className="hide-s" title={commitTitle(p)}>results commit: {commitLabel(p.results_code_commit)}</span> : null}
       <span className="grow" />
