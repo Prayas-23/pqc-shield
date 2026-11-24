@@ -22,7 +22,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from pqdl.features import CONTEXT_FEATURES
 from pqdl.handshake import LAB_MSS, client_flight_bytes, n_packets, server_flight_bytes
-from pqdl.profiles import Profile
+from pqdl.profiles import SIZES, Overheads, Profile
 
 CLASSICAL_CONTEXT = "X25519|ecdsa_p256|leaf_int"
 ALPHA = 0.05
@@ -63,16 +63,27 @@ class HandshakeDelta:
     c2s_pkts: int
 
 
-def handshake_delta(context: str, reference: str = CLASSICAL_CONTEXT, mss: int = LAB_MSS) -> HandshakeDelta:
-    """Differences only: B_S, B_C and their packet counts at `mss`, context minus reference."""
+def _overheads(context: str, o_cert_by_auth: Mapping[str, float] | None) -> Overheads:
+    """Default overheads, or (CANON-A2, exploratory) with the measured per-auth certificate overhead (rounded to bytes)."""
+    if o_cert_by_auth is None:
+        return Overheads()
+    return Overheads(o_cert=int(round(o_cert_by_auth[context.split("|")[1]])))
+
+
+def handshake_delta(context: str, reference: str = CLASSICAL_CONTEXT, mss: int = LAB_MSS,
+                    o_cert_by_auth: Mapping[str, float] | None = None) -> HandshakeDelta:
+    """Differences only: B_S, B_C and their packet counts at `mss`, context minus reference. `o_cert_by_auth`
+    (lab auth name -> bytes) is the CANON-A2 override of the default 40 B per-certificate overhead; None = CANON-A."""
     p, r = context_profile(context), context_profile(reference)
-    bs_p, bs_r = server_flight_bytes(p), server_flight_bytes(r)
-    bc_p, bc_r = client_flight_bytes(p), client_flight_bytes(r)
+    ov_p, ov_r = _overheads(context, o_cert_by_auth), _overheads(reference, o_cert_by_auth)
+    bs_p, bs_r = server_flight_bytes(p, ov_p), server_flight_bytes(r, ov_r)
+    bc_p, bc_r = client_flight_bytes(p, ov_p), client_flight_bytes(r, ov_r)
     return HandshakeDelta(bs_p - bs_r, bc_p - bc_r, n_packets(bs_p, mss) - n_packets(bs_r, mss),
                           n_packets(bc_p, mss) - n_packets(bc_r, mss))
 
 
-def correct_a(flows: pd.DataFrame, contexts: Sequence[str], groups: Sequence[str]) -> pd.DataFrame:
+def correct_a(flows: pd.DataFrame, contexts: Sequence[str], groups: Sequence[str],
+              o_cert_by_auth: Mapping[str, float] | None = None) -> pd.DataFrame:
     """CANON-A: return a copy of the V_FLOW columns of `flows` corrected for the handshake difference of each flow's
     context. `groups` lists the corrected groups: 'bytes', 'pkts' and/or 'pktlen' (mean only, recomputed). 'time'
     is never corrected (no validated model). Counts are floored at 0."""
@@ -82,7 +93,7 @@ def correct_a(flows: pd.DataFrame, contexts: Sequence[str], groups: Sequence[str
     ctx = np.asarray(contexts, dtype=object)
     if len(ctx) != len(out):
         raise ValueError("one context per flow required")
-    deltas = {c: handshake_delta(c) for c in set(ctx)}
+    deltas = {c: handshake_delta(c, o_cert_by_auth=o_cert_by_auth) for c in set(ctx)}
     col = lambda f: np.array([getattr(deltas[c], f) for c in ctx], dtype=float)   # noqa: E731
     if "bytes" in groups:
         out["flow_s2c_bytes"] = np.maximum(out["flow_s2c_bytes"].to_numpy(float) - col("s2c_bytes"), 0.0)
@@ -157,3 +168,19 @@ def calibration_draw(benign_val: pd.DataFrame, k: int, seed: int) -> pd.DataFram
         raise ValueError(f"need {k} calibration flows, only {len(benign_val)} available")
     order = np.random.default_rng(seed).permutation(len(benign_val))
     return benign_val.iloc[order[:k]]
+
+
+def split_calibration(calibration: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """CANON-B 'split' variant (post-hoc correction): the first half of the k calibration flows fits the shift g_j(c),
+    the second half sets the conformal threshold, so the threshold flows are not used to fit the correction."""
+    k = len(calibration)
+    if k < 2 or k % 2:
+        raise ValueError("split calibration needs an even number k >= 2 of flows")
+    return calibration.iloc[: k // 2], calibration.iloc[k // 2:]
+
+
+def measured_o_cert(auth: str, leaf_der: int, int_der: int) -> float:
+    """CANON-A2 (exploratory): per-certificate overhead = DER size - public key - signature (sizes from the size model's
+    SIZES table), averaged over the leaf and the intermediate certificate of the lab chain."""
+    pk, sig = SIZES["auth"][AUTH_MAP[auth]]
+    return ((leaf_der - pk - sig) + (int_der - pk - sig)) / 2

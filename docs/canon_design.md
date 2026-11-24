@@ -136,5 +136,20 @@ one more reason not to correct packet counts.
 
 ## Change log
 
+- 2026-11-24 (POST-HOC, after the v0 test-block results were seen; the frozen v0 results stay as reported):
+  1. **CANON-B "split" variant added** (methods `canon_bs_k{60,100,120}`, true and c-hat). Why: v0 used the same k
+     calibration flows to fit the shift g_j(c) and to set the conformal threshold tau_c. That is not valid for the
+     conformal guarantee (the threshold flows were used to fit the correction). Split: the first k/2 flows (seeded
+     permutation, nested) fit the shift, the last k/2 set tau_c = the ceil((n+1)(1-alpha))-th smallest score with n=k/2.
+     k in {60, 100, 120} (the validation block has 120 benign flows per profile). k=30 is skipped: n=15 gives rank 16 >
+     15, a vacuous threshold. v0 variants (`canon_b_k*`) are kept unchanged for comparison.
+  2. **AE max_iter raised from 500 to 2000** everywhere (baseline and CANON). Why: 20 of 105 baseline AE fits had not
+     converged at 500. Before/after numbers are reported; the v0 detector results are re-run, not edited.
+  3. **CANON-A2 added, EXPLORATORY and post-hoc** (methods `canon_a2_*`): CANON-A with the default 40 B per-certificate
+     overhead replaced by the measured value from the lab's own certificates (DER size - public key - signature, public
+     key and signature from the size model's SIZES table, averaged over the leaf and intermediate certificate; fresh
+     throwaway PKI generated in the lab container by `lab/gen_certs.sh`; `scripts/measure_cert_overhead.py`). CANON-A is
+     NOT replaced. Other overheads stay at their defaults. This choice was made after seeing that CANON-A fails on the
+     `leaf` profiles, so it is a post-hoc diagnosis and must not be read as a pre-registered result.
 - 2026-11-24: section 10 added after the pre-registered attribution run (validation blocks only; no CANON test-block
   result existed). The previous "(none yet)" line was replaced by this entry.

@@ -106,7 +106,7 @@ class FitLog:
 
 
 FIT_LOG = FitLog()
-AE_HIDDEN, AE_MAX_ITER = (16, 4, 16), 500
+AE_HIDDEN, AE_MAX_ITER = (16, 4, 16), 2000      # was 500 until the post-hoc re-run (20 of 105 fits had not converged)
 
 
 def design_matrix(df: pd.DataFrame, cols: Sequence[str]) -> np.ndarray:

@@ -182,6 +182,8 @@ def notes(san: pd.DataFrame, dose: pd.DataFrame, conf: pd.DataFrame, med: pd.Dat
               "| detector | method | FPR | TPR (all attacks) | AUROC |", "|---|---|---|---|---|"]
     for r in med.itertuples():
         lines.append(f"| {r.detector} | {r.method} | {r.fpr:.3f} | {r.tpr_all:.3f} | {r.auroc:.3f} |")
+    lines += ["", "## TPR per attack type", "",
+              "Classical in-domain and oracle TPR for handshake_flood vs slow_send: `results/detector_attack_type_tpr.csv`.", ""]
     lines += ["", "## Dose-response (naive V_FLOW FPR vs median hs_s2c_bytes of the profile)", ""]
     for det, g in dose.groupby("detector"):
         rho, p = spearmanr(g["hs_s2c_median"], g["fpr_naive"])
@@ -208,6 +210,21 @@ def notes(san: pd.DataFrame, dose: pd.DataFrame, conf: pd.DataFrame, med: pd.Dat
               "intervals are optimistic.",
               "- Per-attack-type TPR for slow_send rests on 20 test flows per profile."]
     return "\n".join(lines) + "\n"
+
+
+def attack_type_table(res: pd.DataFrame) -> pd.DataFrame:
+    """TPR per attack type (handshake_flood vs slow_send): classical in-domain (naive on the classical profile) and the
+    oracle (median / min / max over the 18 profiles), per detector, main-run test blocks."""
+    m = res[(res.dataset == "main") & res.metric.isin(["tpr_handshake_flood", "tpr_slow_send"])]
+    rows = []
+    for det in dt.DETECTORS:
+        for metric in ("tpr_handshake_flood", "tpr_slow_send"):
+            c = m[(m.detector == det) & (m.metric == metric) & (m.method == "naive") & (m.profile == CLASSICAL)].iloc[0]
+            o = m[(m.detector == det) & (m.metric == metric) & (m.method == "oracle")]["value"]
+            rows.append({"detector": det, "attack_type": metric.replace("tpr_", ""), "classical_in_domain": c.value,
+                         "classical_ci_lo": c.ci_lo, "classical_ci_hi": c.ci_hi, "oracle_median": o.median(),
+                         "oracle_min": o.min(), "oracle_max": o.max()})
+    return pd.DataFrame(rows)
 
 
 def show(title: str, df: pd.DataFrame) -> None:
@@ -245,7 +262,10 @@ def main(argv: list[str]) -> int:
     show("dose-response: naive FPR vs median hs_s2c_bytes", dose.drop(columns=["fpr_naive_ci_lo", "fpr_naive_ci_hi"]))
     show("confirmation: FPR, main vs replicate run (naive detectors from the main run)",
          conf[conf.metric == "fpr"].drop(columns=["metric", "view"]))
-    print(f"\nAE fits not converged at max_iter: {dt.FIT_LOG.ae_not_converged}/{dt.FIT_LOG.ae_fits}")
+    att = attack_type_table(res)
+    att.to_csv(out / "detector_attack_type_tpr.csv", index=False)
+    show("TPR per attack type: classical in-domain and oracle (test blocks)", att)
+    print(f"AE fits not converged at max_iter={dt.AE_MAX_ITER}: {dt.FIT_LOG.ae_not_converged}/{dt.FIT_LOG.ae_fits}")
     return 0
 
 

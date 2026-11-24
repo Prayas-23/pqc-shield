@@ -155,3 +155,38 @@ def test_context_features_never_accepted_by_detectors():
     from pqdl import detectors as dt
     with pytest.raises(ValueError):
         dt.assert_clean_features([*dt.V_FLOW, CONTEXT_FEATURES[0]])
+
+
+# ---- post-hoc additions: split calibration and CANON-A2 (exploratory)
+def test_split_calibration_halves_are_disjoint_and_ordered():
+    df = pd.DataFrame({"x": np.arange(60.0)})
+    fit, thr = canon.split_calibration(df)
+    assert len(fit) == len(thr) == 30 and set(fit.index).isdisjoint(thr.index)
+    assert list(fit.index) == list(range(30)) and list(thr.index) == list(range(30, 60))
+    with pytest.raises(ValueError):
+        canon.split_calibration(df.iloc[:59])
+
+
+def test_split_halves_give_nonvacuous_threshold_from_k60_but_not_k30():
+    assert np.isinf(canon.conformal_threshold(np.arange(15.0)))           # k=30 -> n=15: rank 16 > 15
+    assert canon.conformal_threshold(np.arange(30.0)) == 29.0              # k=60 -> n=30: rank 30 = max
+    assert canon.conformal_rank(50) == 49 and canon.conformal_rank(60) == 58   # k=100, k=120
+
+
+def test_a2_uses_measured_o_cert_and_default_is_unchanged():
+    o = {"ecdsa_p256": 405.0, "mldsa65": 392.0}
+    base = canon.handshake_delta(PQ)
+    a2 = canon.handshake_delta(PQ, o_cert_by_auth=o)
+    # leaf_int = 2 certs: extra server bytes = 2 * (o_cert(ctx) - o_cert(ref)) relative to the default delta (which uses 40 for both)
+    assert a2.s2c_bytes - base.s2c_bytes == 2 * (392 - 405)
+    assert a2.c2s_bytes == base.c2s_bytes
+    assert canon.handshake_delta(CLS, o_cert_by_auth=o).s2c_bytes == 0
+    f = flows(1)
+    assert canon.correct_a(f, [PQ], ["bytes"], o).loc[0, "flow_s2c_bytes"] == 20000 - a2.s2c_bytes
+    assert canon.correct_a(f, [PQ], ["bytes"]).loc[0, "flow_s2c_bytes"] == 20000 - base.s2c_bytes
+
+
+def test_measured_o_cert_formula():
+    # mldsa65: pk 1952, sig 3309 -> framing = DER - 5261
+    assert canon.measured_o_cert("mldsa65", 5673, 5633) == ((5673 - 5261) + (5633 - 5261)) / 2 == 392.0
+    assert canon.measured_o_cert("ecdsa_p256", 552, 514) == ((552 - 128) + (514 - 128)) / 2 == 405.0

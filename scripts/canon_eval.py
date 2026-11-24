@@ -27,6 +27,7 @@ CAL_SEED = 20261127
 CORRECTED_GROUPS = ["bytes"]                 # frozen in docs/canon_design.md section 10
 SHIFTED_COLS = canon.group_features(CORRECTED_GROUPS)
 KS = (10, 30, 100)
+KS_SPLIT = (60, 100, 120)                    # post-hoc split variant; k=30 would give n=15 and a vacuous threshold
 CLASSICAL = canon.CLASSICAL_CONTEXT
 BASELINE_METHODS = ("naive", "naive_app", "pooled", "oracle")
 
@@ -43,47 +44,53 @@ def blocks(df: pd.DataFrame, block: str, profile: str | None = None) -> pd.DataF
 
 
 class Canon:
-    """Everything CANON fits on the MAIN run: c-hat, the calibration banks per k, and per detector the naive domain."""
+    """Everything CANON fits on the MAIN run: c-hat, the calibration banks, and per detector the naive domain.
 
-    def __init__(self, main: pd.DataFrame) -> None:
+    Bank keys: "b{k}"  = CANON-B, the same k flows fit the shift and set the threshold (original v0);
+               "bs{k}" = CANON-B split (post-hoc correction): first k/2 flows fit the shift, last k/2 set the threshold."""
+
+    def __init__(self, main: pd.DataFrame, o_cert: dict[str, float] | None) -> None:
+        self.o_cert = o_cert                                  # CANON-A2 (exploratory); None = A2 not run
         self.estimator = canon.fit_context_estimator(blocks(main, "train"), seed=0)
         self.contexts = sorted(main["profile"].unique())
-        ref = blocks(main, "train", CLASSICAL)
-        ref = ref[~ref["attack"]]
-        self.shifts: dict[int, dict[str, np.ndarray]] = {k: {} for k in KS}
-        self.calib: dict[int, dict[str, pd.DataFrame]] = {k: {} for k in KS}
+        self.ref = blocks(main, "train", CLASSICAL)
+        self.ref = self.ref[~self.ref["attack"]]
+        self.naive: dict[str, dt.Domain] = {
+            det: dt.fit_domain(det, dt.V_FLOW, blocks(main, "train", CLASSICAL), blocks(main, "val", CLASSICAL), SEEDS)
+            for det in dt.DETECTORS}
+        self.shifts: dict[str, dict[str, np.ndarray]] = {}
+        self.tau: dict[tuple[str, str], dict[str, np.ndarray]] = {}
         for i, c in enumerate(self.contexts):
             val_benign = blocks(main, "val", c)
             val_benign = val_benign[~val_benign["attack"]]
             for k in KS:
                 cal = canon.calibration_draw(val_benign, k, CAL_SEED + i)
-                self.calib[k][c] = cal
-                self.shifts[k][c] = canon.location_shift(cal, ref, SHIFTED_COLS)
-        self.naive: dict[str, dt.Domain] = {
-            det: dt.fit_domain(det, dt.V_FLOW, blocks(main, "train", CLASSICAL), blocks(main, "val", CLASSICAL), SEEDS)
-            for det in dt.DETECTORS}
-        self.tau: dict[tuple[str, int], dict[str, np.ndarray]] = {}
+                self._add(f"b{k}", c, cal, cal)
+            for k in KS_SPLIT:
+                fit_part, thr_part = canon.split_calibration(canon.calibration_draw(val_benign, k, CAL_SEED + i))
+                self._add(f"bs{k}", c, fit_part, thr_part)
+
+    def _add(self, key: str, c: str, fit_part: pd.DataFrame, thr_part: pd.DataFrame) -> None:
+        shift = canon.location_shift(fit_part, self.ref, SHIFTED_COLS)
+        self.shifts.setdefault(key, {})[c] = shift
+        res = canon.residualise(thr_part, [c] * len(thr_part), {c: shift}, SHIFTED_COLS)
         for det in dt.DETECTORS:
-            for k in KS:
-                self.tau[(det, k)] = {}
-                for c in self.contexts:
-                    cal = self.calib[k][c]
-                    res = canon.residualise(cal, [c] * len(cal), self.shifts[k], SHIFTED_COLS)
-                    sc = self.naive[det].score(dt.design_matrix(res, dt.V_FLOW))            # (S, k)
-                    self.tau[(det, k)][c] = np.array([canon.conformal_threshold(s) for s in sc])
+            sc = self.naive[det].score(dt.design_matrix(res, dt.V_FLOW))                    # (S, n_thr)
+            self.tau.setdefault((det, key), {})[c] = np.array([canon.conformal_threshold(x) for x in sc])
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         return canon.predict_context(self.estimator, df)
 
-    def margins_a(self, det: str, g: pd.DataFrame, ctx: np.ndarray) -> np.ndarray:
-        """CANON-A: naive detector on bytes-corrected features; margin = score - classical validation threshold."""
-        X = dt.design_matrix(canon.correct_a(g, ctx, CORRECTED_GROUPS), dt.V_FLOW)
+    def margins_a(self, det: str, g: pd.DataFrame, ctx: np.ndarray, o_cert: dict[str, float] | None = None) -> np.ndarray:
+        """CANON-A (o_cert None) or exploratory CANON-A2: naive detector on bytes-corrected features;
+        margin = score - classical validation threshold."""
+        X = dt.design_matrix(canon.correct_a(g, ctx, CORRECTED_GROUPS, o_cert), dt.V_FLOW)
         return self.naive[det].score(X) - self.naive[det].thresholds[:, None]
 
-    def margins_b(self, det: str, k: int, g: pd.DataFrame, ctx: np.ndarray) -> np.ndarray:
+    def margins_b(self, det: str, key: str, g: pd.DataFrame, ctx: np.ndarray) -> np.ndarray:
         """CANON-B: naive detector on residualised features; margin = score - per-context conformal tau."""
-        X = dt.design_matrix(canon.residualise(g, ctx, self.shifts[k], SHIFTED_COLS), dt.V_FLOW)
-        taus = np.stack([self.tau[(det, k)][c] for c in ctx], axis=1)                     # (S, n)
+        X = dt.design_matrix(canon.residualise(g, ctx, self.shifts[key], SHIFTED_COLS), dt.V_FLOW)
+        taus = np.stack([self.tau[(det, key)][c] for c in ctx], axis=1)                     # (S, n)
         with np.errstate(invalid="ignore"):
             return self.naive[det].score(X) - taus
 
@@ -92,9 +99,15 @@ def method_margins(cn: Canon, det: str, g: pd.DataFrame) -> dict[str, np.ndarray
     true = (g["kem"] + "|" + g["auth"] + "|" + g["chain"]).to_numpy()
     chat = cn.predict(g)
     out = {"canon_a_true": cn.margins_a(det, g, true), "canon_a_chat": cn.margins_a(det, g, chat)}
+    if cn.o_cert is not None:                                 # EXPLORATORY, post-hoc
+        out["canon_a2_true"] = cn.margins_a(det, g, true, cn.o_cert)
+        out["canon_a2_chat"] = cn.margins_a(det, g, chat, cn.o_cert)
     for k in KS:
-        out[f"canon_b_k{k}_true"] = cn.margins_b(det, k, g, true)
-        out[f"canon_b_k{k}_chat"] = cn.margins_b(det, k, g, chat)
+        out[f"canon_b_k{k}_true"] = cn.margins_b(det, f"b{k}", g, true)
+        out[f"canon_b_k{k}_chat"] = cn.margins_b(det, f"b{k}", g, chat)
+    for k in KS_SPLIT:
+        out[f"canon_bs_k{k}_true"] = cn.margins_b(det, f"bs{k}", g, true)
+        out[f"canon_bs_k{k}_chat"] = cn.margins_b(det, f"bs{k}", g, chat)
     return out
 
 
@@ -156,6 +169,28 @@ def agreement(canon_res: pd.DataFrame) -> pd.DataFrame:
     return j[keys + ["value_main", "ci_lo_main", "ci_hi_main", "value_rep", "ci_lo_rep", "ci_hi_rep", "abs_diff", "ci_overlap"]]
 
 
+def per_context_coverage(res: pd.DataFrame) -> pd.DataFrame:
+    """Per context: FPR and 95% CI of the CANON-B variants (true context) on the main test block, '*' if alpha is outside."""
+    m = res[(res.dataset == "main") & (res.metric == "fpr") & res.method.str.startswith("canon_b") & res.method.str.endswith("_true")]
+    out = m[["profile", "detector", "method", "value", "ci_lo", "ci_hi"]].copy()
+    out["alpha_in_ci"] = (out.ci_lo <= dt.DESIGN_FPR) & (dt.DESIGN_FPR <= out.ci_hi)
+    out["cell"] = [f"{r.value:.3f} [{r.ci_lo:.3f},{r.ci_hi:.3f}]" + ("" if r.alpha_in_ci else " *") for r in out.itertuples()]
+    return out
+
+
+def ae_before_after(before_dir: Path | None, base_after: pd.DataFrame, res_after: pd.DataFrame) -> pd.DataFrame:
+    """Median FPR / TPR / AUROC over the 17 non-classical profiles for the AE, before (max_iter 500) and after (2000)."""
+    def med(df: pd.DataFrame) -> pd.DataFrame:
+        d = df[(df.dataset == "main") & (df.detector == "ae") & (df.profile != CLASSICAL) & df.metric.isin(["fpr", "tpr_all", "auroc"])]
+        return d.groupby(["method", "metric"])["value"].median().unstack("metric")
+    after = pd.concat([med(base_after), med(res_after)])
+    if before_dir is None:
+        return after.reset_index()
+    before = pd.concat([med(pd.read_csv(before_dir / "detector_baseline.csv")), med(pd.read_csv(before_dir / "canon_eval.csv"))])
+    j = before.join(after, lsuffix="_before", rsuffix="_after", how="outer")
+    return j[[f"{m}_{w}" for m in ("fpr", "tpr_all", "auroc") for w in ("before", "after")]].reset_index()
+
+
 def show(title: str, df: pd.DataFrame) -> None:
     print(f"\n=== {title}")
     print(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
@@ -176,7 +211,15 @@ def notes(cmp_: pd.DataFrame, cov: pd.DataFrame, acc: dict[str, float], per_main
          "| detector | method | FPR | TPR (all) | AUROC | profiles with FPR <= 0.10 |", "|---|---|---|---|---|---|"]
     for r in cmp_.itertuples():
         L.append(f"| {r.detector} | {r.method} | {r.fpr:.3f} | {r.tpr_all:.3f} | {r.auroc:.3f} | {r.n_profiles_fpr_le_010} |")
-    L += ["", "CANON-B AUROC is computed on the margin (score minus the per-context threshold). With k=10 the conformal "
+    L += ["", "## Post-hoc additions (recorded in `docs/canon_design.md` change log; NOT part of the frozen v0 design)", "",
+          f"- **canon_bs_k*** = CANON-B *split*: the first k/2 calibration flows fit the shift, the last k/2 set the conformal "
+          f"threshold (k in {list(KS_SPLIT)}; k=30 would give n=15 and a vacuous threshold, so it is skipped). Reason: v0 used "
+          "the same k flows for both, which voids the conformal guarantee.",
+          "- **canon_a2_*** = CANON-A2, EXPLORATORY and post-hoc: the default 40 B per-certificate overhead is replaced by the "
+          "measured value from the lab's own certificates (`results/cert_overhead.csv`). CANON-A is unchanged.",
+          f"- AE re-run with max_iter={dt.AE_MAX_ITER} (was 500). AE fits not converged in this script: "
+          f"{dt.FIT_LOG.ae_not_converged}/{dt.FIT_LOG.ae_fits}.", "",
+          "CANON-B AUROC is computed on the margin (score minus the per-context threshold). With k=10 the conformal "
           "threshold is +inf (rank 11 > 10), so nothing is flagged: FPR = TPR = 0 and AUROC = 0.5 by construction.", "",
           "## Conformal coverage of CANON-B (FPR per context vs alpha = 0.05, main test blocks)", "",
           "| detector | method | median FPR | mean abs deviation | contexts with alpha in 95% CI |", "|---|---|---|---|---|"]
@@ -201,7 +244,11 @@ def main(argv: list[str]) -> int:
     main_df, rep_df = load("lab_flows.csv"), load("lab_flows_rep.csv")
     assert not set(CONTEXT_FEATURES) & set(dt.V_FLOW)
     t0 = time.time()
-    cn = Canon(main_df)
+    cert_path = ROOT / "results" / "cert_overhead.csv"
+    o_cert = dict(pd.read_csv(cert_path)[["auth", "o_cert"]].itertuples(index=False)) if cert_path.exists() else None
+    if o_cert is None:
+        print("results/cert_overhead.csv missing: CANON-A2 (exploratory) NOT run; run scripts/measure_cert_overhead.py")
+    cn = Canon(main_df, o_cert)
     print(f"fitted c-hat, banks and naive domains ({time.time() - t0:.0f} s)", flush=True)
     per_main, cm_main, acc_main = context_report(cn, main_df)
     per_rep, cm_rep, acc_rep = context_report(cn, rep_df)
@@ -228,16 +275,29 @@ def main(argv: list[str]) -> int:
     agr.to_csv(out / "canon_confirmation.csv", index=False)
     (ROOT / "docs" / "canon_notes.md").write_text(notes(cmp_, cov, {"main": acc_main, "rep": acc_rep}, per_main, agr, n_boot),
                                                    encoding="utf-8", newline="\n")
-    order = ["naive", "naive_app", "pooled", "oracle", "canon_a_true", "canon_a_chat",
-             *[f"canon_b_k{k}_{v}" for k in KS for v in ("true", "chat")]]
+    order = ["naive", "naive_app", "pooled", "oracle", "canon_a_true", "canon_a_chat", "canon_a2_true", "canon_a2_chat",
+             *[f"canon_b_k{k}_{v}" for k in KS for v in ("true", "chat")],
+             *[f"canon_bs_k{k}_{v}" for k in KS_SPLIT for v in ("true", "chat")]]
     cmp_["method"] = pd.Categorical(cmp_["method"], order)
-    show("median over the 17 non-classical profiles (main run)", cmp_.sort_values(["detector", "method"]))
-    show("CANON-B conformal coverage: FPR per context vs alpha = 0.05", cov)
+    show("median over the 17 non-classical profiles (main run); canon_a2 = EXPLORATORY post-hoc, canon_bs = post-hoc split",
+         cmp_.sort_values(["detector", "method"]))
+    show("CANON-B conformal coverage (summary over the 18 contexts): FPR vs alpha = 0.05", cov)
+    pc = per_context_coverage(res)
+    pc.to_csv(out / "canon_coverage_per_context.csv", index=False)
+    for det in ("ae", "rf"):
+        t = pc[pc.detector == det].pivot_table(index="profile", columns="method", values="cell", aggfunc="first")
+        show(f"{det}: FPR per context [95% CI] on the test block, '*' = alpha 0.05 outside the CI "
+             "(true and c-hat contexts are identical: c-hat accuracy is 100%)", t.reset_index())
+    show("AE before/after max_iter 500 -> 2000 (median over the 17 non-classical profiles)",
+         ae_before_after(Path(argv[argv.index("--before") + 1]) if "--before" in argv else None, base, res))
+    print(f"AE fits in this script (naive domains) not converged at max_iter={dt.AE_MAX_ITER}: "
+          f"{dt.FIT_LOG.ae_not_converged}/{dt.FIT_LOG.ae_fits}")
     allm = pd.concat([base[(base.dataset == "main") & base.method.isin(BASELINE_METHODS)], res[res.dataset == "main"]])
+    keep = ["naive", "naive_app", "oracle", "canon_a_true", "canon_a2_true", "canon_b_k100_true", "canon_bs_k60_true",
+            "canon_bs_k100_true", "canon_bs_k120_true"]
     for det in dt.DETECTORS:
         t = allm[(allm.detector == det) & (allm.metric == "fpr")].pivot_table(index="profile", columns="method", values="value")
-        show(f"{det}: FPR per profile", t[["naive", "naive_app", "oracle", "canon_a_true", "canon_a_chat",
-                                           "canon_b_k30_true", "canon_b_k30_chat", "canon_b_k100_chat"]].reset_index())
+        show(f"{det}: FPR per profile", t[[c for c in keep if c in t.columns]].reset_index())
     a = agr[agr.metric == "fpr"]
     show("confirmation: FPR main vs replicate (CANON from the main run), cells where CIs do not overlap",
          a[~a.ci_overlap])
