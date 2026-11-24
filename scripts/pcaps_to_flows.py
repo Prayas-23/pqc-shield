@@ -72,7 +72,8 @@ def build_flows(manifest: pd.DataFrame) -> pd.DataFrame:
         df.insert(0, "source", SOURCE)
         df.insert(len(MANIFEST_COLS) + 1, "pcap_file", m.pcap_file)
         df.insert(len(MANIFEST_COLS) + 2, "conn_index", range(len(df)))
-        for col in reversed(CAPTURE_COLS):
+        extra = [c for c in ("replicate_id", "run_order") if c in manifest.columns]   # present in --rep manifests
+        for col in reversed(CAPTURE_COLS + extra):
             df.insert(len(MANIFEST_COLS) + 3, col, getattr(m, col))
         frames.append(df)
     return pd.concat(frames, ignore_index=True)
