@@ -142,6 +142,36 @@ Paired median FPR difference over profiles (method minus reference), 95% bootstr
 | CANON-B v0 k=100 | oracle | -0.015 | -0.028 | -0.005 |
 | CANON-B split k=120 | oracle | -0.016 | -0.025 | -0.005 |
 
+## 3b. Calibration-error ranking: Friedman + Nemenyi on |FPR - 0.05| (RF and AE, same 17 profiles and 8 methods)
+
+**Why this table exists.** Ranking raw FPR (section 3) rewards any method that flags less, so a conservative threshold wins by construction: RF scores tie at 0, the 95th-percentile threshold lands at 0 or above, and RF can reach FPR = 0 on benign flows while still catching attacks. That says nothing about being calibrated to the 5% design point. |FPR - 0.05| penalises both over- and under-flagging, so it measures calibration. Lower is better; same caveats (profiles are not independent blocks; claims-table rules are unchanged and still use the raw-FPR analysis).
+
+### rf: Friedman chi2 = 89.15, p = 1.85e-16; Nemenyi CD = 2.55
+
+| method | average rank | median |FPR - 0.05| |
+|---|---|---|
+| oracle | 1.412 | 0.017 |
+| pooled | 2.147 | 0.025 |
+| V_APP | 3.794 | 0.047 |
+| CANON-B v0 k=100 | 5.059 | 0.050 |
+| CANON-B split k=120 | 5.118 | 0.050 |
+| CANON-A2 (exploratory) | 5.235 | 0.050 |
+| CANON-A | 5.912 | 0.050 |
+| naive | 7.324 | 0.950 |
+
+### ae: Friedman chi2 = 90.38, p = 1.03e-16; Nemenyi CD = 2.55
+
+| method | average rank | median |FPR - 0.05| |
+|---|---|---|
+| CANON-B v0 k=100 | 2.412 | 0.008 |
+| CANON-B split k=120 | 2.794 | 0.012 |
+| pooled | 3.147 | 0.020 |
+| oracle | 3.294 | 0.020 |
+| V_APP | 3.353 | 0.022 |
+| CANON-A2 (exploratory) | 6.941 | 0.950 |
+| naive | 7.029 | 0.950 |
+| CANON-A | 7.029 | 0.950 |
+
 ## 4. McNemar (exact), paired flow decisions on the same test flows, per profile, Holm within each family
 
 Model seed 11 only (one detector instance per method). `benign` = false alarms, `attack` = detections. Per-profile counts in `results/stats_mcnemar.csv`. Profiles significant at Holm p < 0.05 (either direction):

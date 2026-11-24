@@ -86,3 +86,12 @@ def test_status_rules():
     assert st.status_from_share(float("nan"), 0.75, 0.25) == "FAIL"
     assert st.combine_status(["PASS", "PASS"]) == "PASS" and st.combine_status(["FAIL", "FAIL"]) == "FAIL"
     assert st.combine_status(["PASS", "FAIL"]) == "PARTIAL"
+
+
+def test_calibration_error_ranking_prefers_hitting_target_over_conservative():
+    t = pd.DataFrame({"conservative": [0.0, 0.0, 0.0], "on_target": [0.05, 0.06, 0.04], "over": [0.5, 0.4, 0.3]})
+    assert st.average_ranks(t)["conservative"] == 1.0                        # raw FPR ranking favours FPR = 0
+    cal = st.calibration_error_table(t)
+    assert cal.loc[0, "conservative"] == pytest.approx(0.05) and cal.loc[0, "on_target"] == pytest.approx(0.0)
+    r = st.average_ranks(cal)
+    assert r["on_target"] == 1.0 and r["conservative"] == 2.0 and r["over"] == 3.0

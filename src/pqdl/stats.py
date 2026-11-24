@@ -34,6 +34,11 @@ def average_ranks(table: pd.DataFrame) -> pd.Series:
     return ranks.mean(axis=0)
 
 
+def calibration_error_table(table: pd.DataFrame, target: float = ALPHA) -> pd.DataFrame:
+    """|value - target| for every cell: ranking this (lower is better) rewards hitting the design FPR from either side."""
+    return (table - target).abs()
+
+
 def friedman(table: pd.DataFrame) -> tuple[float, float]:
     """(chi-square, p) of the Friedman test over the columns of `table` (blocks x treatments); NaN if degenerate."""
     if table.shape[1] < 3 or table.shape[0] < 2:
