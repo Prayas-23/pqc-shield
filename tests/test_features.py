@@ -56,8 +56,9 @@ def test_drift_features_are_numeric_and_vary_on_normal_rows() -> None:
 
 
 def test_lab_views_are_disjoint_and_sized() -> None:
-    views = [f.LAB_HS_FEATURES, f.LAB_APP_FEATURES, f.LAB_FLOW_FEATURES, tuple(f.LAB_EXCLUDED)]
-    assert [len(v) for v in views[:3]] == [6, 32, 11]
+    views = [f.LAB_HS_FEATURES, f.LAB_APP_FEATURES, f.LAB_FLOW_FEATURES, tuple(f.LAB_EXCLUDED), f.CONTEXT_FEATURES]
+    assert [len(v) for v in views[:3]] == [6, 32, 11] and len(f.CONTEXT_FEATURES) == 24
+    assert f.FEATURES_VERSION == "4"
     names = [n for v in views for n in v]
     assert len(names) == len(set(names))                      # no column in two lists
     assert all(n.startswith("hs_") for n in f.LAB_HS_FEATURES) and all(n.startswith("app_") for n in f.LAB_APP_FEATURES)
@@ -73,5 +74,5 @@ def test_lab_lists_cover_every_flows_column(tmp_path: Path) -> None:
     parser_columns = set(extract_connections(synthetic_two_connections(tmp_path))[0])
     script_columns = {"source", "kem", "auth", "chain", "workload", "label", "pcap_file", "conn_index",
                       "intended_sessions", "tcpdump_dropped", "capture_offload_ok", "max_tcp_payload"}
-    covered = set(f.LAB_HS_FEATURES) | set(f.LAB_APP_FEATURES) | set(f.LAB_FLOW_FEATURES) | set(f.LAB_EXCLUDED)
+    covered = set(f.LAB_HS_FEATURES) | set(f.LAB_APP_FEATURES) | set(f.LAB_FLOW_FEATURES) | set(f.LAB_EXCLUDED) | set(f.CONTEXT_FEATURES)
     assert parser_columns | script_columns == covered

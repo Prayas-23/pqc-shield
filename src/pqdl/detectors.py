@@ -27,7 +27,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
-from pqdl.features import LAB_APP_FEATURES, LAB_EXCLUDED, LAB_FLOW_FEATURES, LAB_HS_FEATURES
+from pqdl.features import CONTEXT_FEATURES, LAB_APP_FEATURES, LAB_EXCLUDED, LAB_FLOW_FEATURES, LAB_HS_FEATURES
 from pqdl.loaders import assert_single_source
 
 V_FLOW: tuple[str, ...] = LAB_FLOW_FEATURES     # what an off-the-shelf flow detector sees
@@ -48,9 +48,9 @@ Scorer = Callable[[np.ndarray], np.ndarray]
 # --------------------------------------------------------------------------- leakage guard and labels
 def assert_clean_features(cols: Sequence[str]) -> None:
     """Raise unless every column is in V_FLOW or V_APP and none is an hs_* or LAB_EXCLUDED column."""
-    bad = [c for c in cols if c.startswith("hs_") or c in LAB_EXCLUDED or c in LAB_HS_FEATURES]
+    bad = [c for c in cols if c.startswith("hs_") or c in LAB_EXCLUDED or c in LAB_HS_FEATURES or c in CONTEXT_FEATURES]
     if bad:
-        raise ValueError(f"forbidden detector features (hs_* or LAB_EXCLUDED): {bad}")
+        raise ValueError(f"forbidden detector features (hs_*, LAB_EXCLUDED or CONTEXT_FEATURES): {bad}")
     unknown = [c for c in cols if c not in V_FLOW and c not in V_APP]
     if unknown:
         raise ValueError(f"features outside the V_FLOW / V_APP views: {unknown}")

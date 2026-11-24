@@ -9,7 +9,7 @@ Flow-feature extraction from our own packet captures (pcap.py) will also live he
 
 from __future__ import annotations
 
-FEATURES_VERSION = "3"  # v2: PQC_DRIFT_FEATURES; v3: LAB_* feature views
+FEATURES_VERSION = "4"  # v2: PQC_DRIFT_FEATURES; v3: LAB_* feature views; v4: CONTEXT_FEATURES
 
 # --- CIC-PQC_OAV: the 32 engineered columns of ml_features_and_labels.csv -------------------
 # Names are exactly as the loader returns them (one-hot columns keep their dataset names).
@@ -240,6 +240,12 @@ LAB_FLOW_FEATURES: tuple[str, ...] = (
     "flow_iat_std",
     "flow_iat_max",
     "flow_duration",
+)
+
+# Early-packet CONTEXT features (v4): payload sizes of the first 12 data packets per direction of the whole connection,
+# 0-padded. Input of the CANON context estimator ONLY. They are never given to a detector (assert_clean_features).
+CONTEXT_FEATURES: tuple[str, ...] = tuple(
+    f"flow_first12_{d}_size_{i}" for d in ("c2s", "s2c") for i in range(1, 13)
 )
 
 LAB_EXCLUDED: dict[str, str] = {

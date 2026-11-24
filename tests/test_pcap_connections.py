@@ -210,3 +210,15 @@ def test_whole_connection_flow_features_hand_computed(tmp_path: Path) -> None:
     lens2 = [0, 0, 0, 100, 178, 64, 0, 0]
     assert r2["flow_pkt_len_mean"] == pytest.approx(statistics.fmean(lens2))   # 342 / 8 = 42.75
     assert r2["flow_pkt_len_max"] == 178
+
+
+def test_context_features_first12_data_packet_sizes(tmp_path: Path) -> None:
+    """SYNTHETIC fixture: payload sizes of the first 12 data packets per direction (zero-payload packets skipped), 0-padded."""
+    rows = extract_connections(synthetic_two_connections(tmp_path))
+    c2s = [rows[0][f"flow_first12_c2s_size_{i}"] for i in range(1, 13)]
+    s2c = [rows[0][f"flow_first12_s2c_size_{i}"] for i in range(1, 13)]
+    assert c2s == [100, 64, 45] + [0] * 9
+    assert s2c == [1000, 1000, 1000, 1078, 505] + [0] * 7                 # the retransmitted 1000 is a packet on the wire
+    r2 = rows[1]
+    assert [r2[f"flow_first12_c2s_size_{i}"] for i in (1, 2, 3)] == [100, 64, 0]
+    assert [r2[f"flow_first12_s2c_size_{i}"] for i in (1, 2)] == [178, 0]

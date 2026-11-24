@@ -281,6 +281,16 @@ def _phase_features(conn: _Conn) -> dict[str, Any]:
     }
 
 
+N_CONTEXT = 12
+
+
+def _first_data_sizes(prefix: str, lens: list[int]) -> dict[str, int]:
+    """Payload sizes of the first N_CONTEXT data packets (payload > 0) in capture order, 0-padded (CONTEXT_FEATURES)."""
+    data = [n for n in lens if n > 0][:N_CONTEXT]
+    data += [0] * (N_CONTEXT - len(data))
+    return {f"{prefix}_{i + 1}": data[i] for i in range(N_CONTEXT)}
+
+
 def _flow_features(conn: _Conn) -> dict[str, Any]:
     """CICFlowMeter-like whole-connection view: ALL TCP packets of the connection (SYN, ACKs and FINs included,
     retransmissions included), both directions, in capture order. Length = TCP payload bytes (0 for pure ACKs);
@@ -292,6 +302,7 @@ def _flow_features(conn: _Conn) -> dict[str, Any]:
     len_mean, len_std, len_max = _stats(lens)
     iat_mean, iat_std, iat_max = _stats([b - a for a, b in zip(times, times[1:])])
     return {
+        **_first_data_sizes("flow_first12_c2s_size", c2s), **_first_data_sizes("flow_first12_s2c_size", s2c),
         "flow_c2s_bytes": sum(c2s), "flow_s2c_bytes": sum(s2c), "flow_c2s_pkts": len(c2s), "flow_s2c_pkts": len(s2c),
         "flow_pkt_len_mean": len_mean, "flow_pkt_len_std": len_std, "flow_pkt_len_max": len_max,
         "flow_iat_mean": iat_mean, "flow_iat_std": iat_std, "flow_iat_max": iat_max,
