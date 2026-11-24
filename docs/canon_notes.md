@@ -12,18 +12,28 @@ Design frozen in `docs/canon_design.md` (sections 1-9 before any run; section 10
 
 | detector | method | FPR | TPR (all) | AUROC | profiles with FPR <= 0.10 |
 |---|---|---|---|---|---|
+| ae | canon_a2_chat | 1.000 | 1.000 | 1.000 | 0 |
+| ae | canon_a2_true | 1.000 | 1.000 | 1.000 | 0 |
 | ae | canon_a_chat | 1.000 | 1.000 | 1.000 | 0 |
 | ae | canon_a_true | 1.000 | 1.000 | 1.000 | 0 |
-| ae | canon_b_k100_chat | 0.048 | 1.000 | 1.000 | 17 |
-| ae | canon_b_k100_true | 0.048 | 1.000 | 1.000 | 17 |
+| ae | canon_b_k100_chat | 0.050 | 1.000 | 1.000 | 17 |
+| ae | canon_b_k100_true | 0.050 | 1.000 | 1.000 | 17 |
 | ae | canon_b_k10_chat | 0.000 | 0.000 | 0.500 | 17 |
 | ae | canon_b_k10_true | 0.000 | 0.000 | 0.500 | 17 |
-| ae | canon_b_k30_chat | 0.026 | 1.000 | 1.000 | 15 |
-| ae | canon_b_k30_true | 0.026 | 1.000 | 1.000 | 15 |
+| ae | canon_b_k30_chat | 0.024 | 1.000 | 1.000 | 15 |
+| ae | canon_b_k30_true | 0.024 | 1.000 | 1.000 | 15 |
+| ae | canon_bs_k100_chat | 0.038 | 1.000 | 1.000 | 17 |
+| ae | canon_bs_k100_true | 0.038 | 1.000 | 1.000 | 17 |
+| ae | canon_bs_k120_chat | 0.056 | 1.000 | 1.000 | 16 |
+| ae | canon_bs_k120_true | 0.056 | 1.000 | 1.000 | 16 |
+| ae | canon_bs_k60_chat | 0.023 | 1.000 | 1.000 | 17 |
+| ae | canon_bs_k60_true | 0.023 | 1.000 | 1.000 | 17 |
 | ae | naive | 1.000 | 1.000 | 0.200 | 0 |
 | ae | naive_app | 0.032 | 1.000 | 1.000 | 17 |
-| ae | oracle | 0.048 | 1.000 | 1.000 | 15 |
+| ae | oracle | 0.053 | 1.000 | 1.000 | 15 |
 | ae | pooled | 0.050 | 0.214 | 0.647 | 17 |
+| iforest | canon_a2_chat | 0.125 | 0.250 | 0.432 | 6 |
+| iforest | canon_a2_true | 0.125 | 0.250 | 0.432 | 6 |
 | iforest | canon_a_chat | 0.129 | 0.250 | 0.435 | 4 |
 | iforest | canon_a_true | 0.129 | 0.250 | 0.435 | 4 |
 | iforest | canon_b_k100_chat | 0.037 | 0.226 | 0.438 | 16 |
@@ -32,10 +42,18 @@ Design frozen in `docs/canon_design.md` (sections 1-9 before any run; section 10
 | iforest | canon_b_k10_true | 0.000 | 0.000 | 0.500 | 17 |
 | iforest | canon_b_k30_chat | 0.012 | 0.210 | 0.434 | 16 |
 | iforest | canon_b_k30_true | 0.012 | 0.210 | 0.434 | 16 |
+| iforest | canon_bs_k100_chat | 0.026 | 0.228 | 0.438 | 15 |
+| iforest | canon_bs_k100_true | 0.026 | 0.228 | 0.438 | 15 |
+| iforest | canon_bs_k120_chat | 0.034 | 0.222 | 0.438 | 17 |
+| iforest | canon_bs_k120_true | 0.034 | 0.222 | 0.438 | 17 |
+| iforest | canon_bs_k60_chat | 0.013 | 0.210 | 0.434 | 17 |
+| iforest | canon_bs_k60_true | 0.013 | 0.210 | 0.434 | 17 |
 | iforest | naive | 0.093 | 0.250 | 0.449 | 9 |
 | iforest | naive_app | 0.060 | 0.200 | 0.807 | 13 |
 | iforest | oracle | 0.049 | 0.222 | 0.720 | 15 |
 | iforest | pooled | 0.025 | 0.206 | 0.614 | 16 |
+| rf | canon_a2_chat | 0.000 | 1.000 | 1.000 | 16 |
+| rf | canon_a2_true | 0.000 | 1.000 | 1.000 | 16 |
 | rf | canon_a_chat | 0.003 | 1.000 | 1.000 | 11 |
 | rf | canon_a_true | 0.003 | 1.000 | 1.000 | 11 |
 | rf | canon_b_k100_chat | 0.000 | 1.000 | 1.000 | 17 |
@@ -44,10 +62,22 @@ Design frozen in `docs/canon_design.md` (sections 1-9 before any run; section 10
 | rf | canon_b_k10_true | 0.000 | 0.000 | 0.500 | 17 |
 | rf | canon_b_k30_chat | 0.000 | 1.000 | 1.000 | 17 |
 | rf | canon_b_k30_true | 0.000 | 1.000 | 1.000 | 17 |
+| rf | canon_bs_k100_chat | 0.000 | 1.000 | 1.000 | 17 |
+| rf | canon_bs_k100_true | 0.000 | 1.000 | 1.000 | 17 |
+| rf | canon_bs_k120_chat | 0.000 | 1.000 | 1.000 | 16 |
+| rf | canon_bs_k120_true | 0.000 | 1.000 | 1.000 | 16 |
+| rf | canon_bs_k60_chat | 0.000 | 1.000 | 1.000 | 17 |
+| rf | canon_bs_k60_true | 0.000 | 1.000 | 1.000 | 17 |
 | rf | naive | 1.000 | 1.000 | 1.000 | 4 |
 | rf | naive_app | 0.003 | 1.000 | 1.000 | 17 |
 | rf | oracle | 0.040 | 1.000 | 1.000 | 17 |
 | rf | pooled | 0.027 | 1.000 | 1.000 | 16 |
+
+## Post-hoc additions (recorded in `docs/canon_design.md` change log; NOT part of the frozen v0 design)
+
+- **canon_bs_k*** = CANON-B *split*: the first k/2 calibration flows fit the shift, the last k/2 set the conformal threshold (k in [60, 100, 120]; k=30 would give n=15 and a vacuous threshold, so it is skipped). Reason: v0 used the same k flows for both, which voids the conformal guarantee.
+- **canon_a2_*** = CANON-A2, EXPLORATORY and post-hoc: the default 40 B per-certificate overhead is replaced by the measured value from the lab's own certificates (`results/cert_overhead.csv`). CANON-A is unchanged.
+- AE re-run with max_iter=2000 (was 500). AE fits not converged in this script: 0/5.
 
 CANON-B AUROC is computed on the margin (score minus the per-context threshold). With k=10 the conformal threshold is +inf (rank 11 > 10), so nothing is flagged: FPR = TPR = 0 and AUROC = 0.5 by construction.
 
@@ -55,28 +85,46 @@ CANON-B AUROC is computed on the margin (score minus the per-context threshold).
 
 | detector | method | median FPR | mean abs deviation | contexts with alpha in 95% CI |
 |---|---|---|---|---|
-| ae | canon_b_k100_chat | 0.047 | 0.014 | 14/18 |
-| ae | canon_b_k100_true | 0.047 | 0.014 | 14/18 |
+| ae | canon_b_k100_chat | 0.050 | 0.014 | 14/18 |
+| ae | canon_b_k100_true | 0.050 | 0.014 | 14/18 |
 | ae | canon_b_k10_chat | 0.000 | 0.050 | 0/18 |
 | ae | canon_b_k10_true | 0.000 | 0.050 | 0/18 |
-| ae | canon_b_k30_chat | 0.027 | 0.033 | 4/18 |
-| ae | canon_b_k30_true | 0.027 | 0.033 | 4/18 |
+| ae | canon_b_k30_chat | 0.026 | 0.034 | 4/18 |
+| ae | canon_b_k30_true | 0.026 | 0.034 | 4/18 |
+| ae | canon_bs_k100_chat | 0.034 | 0.021 | 9/18 |
+| ae | canon_bs_k100_true | 0.034 | 0.021 | 9/18 |
+| ae | canon_bs_k120_chat | 0.053 | 0.019 | 11/18 |
+| ae | canon_bs_k120_true | 0.053 | 0.019 | 11/18 |
+| ae | canon_bs_k60_chat | 0.023 | 0.029 | 6/18 |
+| ae | canon_bs_k60_true | 0.023 | 0.029 | 6/18 |
 | iforest | canon_b_k100_chat | 0.039 | 0.027 | 7/18 |
 | iforest | canon_b_k100_true | 0.039 | 0.027 | 7/18 |
 | iforest | canon_b_k10_chat | 0.000 | 0.050 | 0/18 |
 | iforest | canon_b_k10_true | 0.000 | 0.050 | 0/18 |
 | iforest | canon_b_k30_chat | 0.015 | 0.033 | 6/18 |
 | iforest | canon_b_k30_true | 0.015 | 0.033 | 6/18 |
+| iforest | canon_bs_k100_chat | 0.025 | 0.030 | 5/18 |
+| iforest | canon_bs_k100_true | 0.025 | 0.030 | 5/18 |
+| iforest | canon_bs_k120_chat | 0.034 | 0.024 | 9/18 |
+| iforest | canon_bs_k120_true | 0.034 | 0.024 | 9/18 |
+| iforest | canon_bs_k60_chat | 0.013 | 0.034 | 2/18 |
+| iforest | canon_bs_k60_true | 0.013 | 0.034 | 2/18 |
 | rf | canon_b_k100_chat | 0.000 | 0.048 | 0/18 |
 | rf | canon_b_k100_true | 0.000 | 0.048 | 0/18 |
 | rf | canon_b_k10_chat | 0.000 | 0.050 | 0/18 |
 | rf | canon_b_k10_true | 0.000 | 0.050 | 0/18 |
 | rf | canon_b_k30_chat | 0.000 | 0.048 | 0/18 |
 | rf | canon_b_k30_true | 0.000 | 0.048 | 0/18 |
+| rf | canon_bs_k100_chat | 0.000 | 0.046 | 1/18 |
+| rf | canon_bs_k100_true | 0.000 | 0.046 | 1/18 |
+| rf | canon_bs_k120_chat | 0.000 | 0.050 | 0/18 |
+| rf | canon_bs_k120_true | 0.000 | 0.050 | 0/18 |
+| rf | canon_bs_k60_chat | 0.000 | 0.049 | 0/18 |
+| rf | canon_bs_k60_true | 0.000 | 0.049 | 0/18 |
 
 ## Confirmation on the replicate run (CANON fitted on the main run, nothing refitted)
 
-- CIs overlap in 272/288 (profile, detector, method, metric) cells (fpr, tpr_all, auroc); largest absolute difference 0.158.
+- CIs overlap in 532/576 (profile, detector, method, metric) cells (fpr, tpr_all, auroc); largest absolute difference 0.158.
 
 ## Caveats
 
