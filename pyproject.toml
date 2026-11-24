@@ -13,5 +13,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = ["realdata: loads the real datasets under data/ (slow); run with `pytest -m realdata`"]
 addopts = "-m 'not realdata'"
