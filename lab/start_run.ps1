@@ -7,7 +7,7 @@
 # Output goes to lab\run.log. The PID of the run is written to lab\run.pid.
 # While the run is alive a second hidden process asks Windows not to go to sleep (it does not change any power
 # setting and exits when the run ends). Keep the laptop plugged in; closing the lid can still sleep it.
-param([ValidateSet("full", "mini")][string]$Mode = "full")
+param([ValidateSet("full", "mini", "rep")][string]$Mode = "full")
 
 $root = Split-Path -Parent $PSScriptRoot
 $bash = "C:\Program Files\Git\bin\bash.exe"
