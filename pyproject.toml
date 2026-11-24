@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pqdl"
+version = "0.1.0"
+description = "PQ-DRIFTLAB: post-quantum handshake drift vs. ML intrusion detectors, with CANON correction"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["realdata: loads the real datasets under data/ (slow); run with `pytest -m realdata`"]
+addopts = "-m 'not realdata'"

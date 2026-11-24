@@ -1,0 +1,12 @@
+# data/* (not data/) so that the README can be re-included; datasets, pcaps and flows are never committed
+data/*
+!data/README.md
+*.pcap
+node_modules/
+.venv/
+__pycache__/
+results/*.csv
+*.egg-info/
+.pytest_cache/
+lab/run.*
+lab/.run.lock/

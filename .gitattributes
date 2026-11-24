@@ -1,0 +1,8 @@
+# Shell scripts run inside Linux containers: keep LF line endings even on Windows checkouts.
+lab/*.sh text eol=lf
+lab/*.cnf text eol=lf
+lab/Dockerfile text eol=lf
+lab/workloads/*.sh text eol=lf
+Makefile text eol=lf
+docker-compose.yml text eol=lf
+*.sh text eol=lf

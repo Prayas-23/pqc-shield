@@ -1,0 +1,28 @@
+# OpenSSL config for the PQ-DRIFTLAB private test PKI (see lab/README.md rule 6).
+# Only used for `req` / `x509` extensions; no providers or TLS settings are configured here.
+
+[ req ]
+distinguished_name = dn
+prompt             = no
+
+[ dn ]
+CN = placeholder
+
+[ v3_ca ]
+basicConstraints     = critical, CA:TRUE
+keyUsage             = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+
+[ v3_int ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid
+
+[ v3_leaf ]
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+extendedKeyUsage       = serverAuth
+subjectAltName         = DNS:server, DNS:localhost, IP:127.0.0.1
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid
