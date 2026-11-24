@@ -128,8 +128,8 @@ CANON-B AUROC is computed on the margin (score minus the per-context threshold).
 
 ## Caveats
 
-- Scripted workloads, one machine, one cipher suite, 18 profiles = 18 'doses'; time-blocked splits inside one pcap.
+- Scripted workloads, one machine, one cipher suite; the profiles are 'doses'; time-blocked splits inside one pcap.
 - The context estimator needs labelled flows of every context, so 'zero PQ training data' holds for the CANON-A correction rule only; the TRUE-context variants isolate that.
-- CANON-A uses default size-model overheads; byte deltas are off by ~34 B for leaf_int and 170-370 B for leaf profiles.
+- CANON-A uses default size-model overheads; the resulting error of the modelled byte differences is in `docs/canon_attribution.md`.
 - CANON-B uses the same k flows for the shift and for tau (mildly optimistic) and corrects bytes only.
 - Bootstrap CIs resample flows and ignore pcap-level variance.

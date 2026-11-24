@@ -4,7 +4,7 @@ Every number is computed from the results CSVs or from repeated draws; nothing i
 
 ## 2. Marginal coverage over 200 calibration draws (AE and RF)
 
-For each context the calibration flows are re-drawn at random from the 120 benign validation flows (200 seeded draws), the correction and the conformal threshold are rebuilt, and the FPR is measured on the FIXED test block. Per context: mean FPR over draws, SD over draws, share of draws with FPR <= alpha + 0.02. Theory: split conformal with n exchangeable calibration scores has true FPR ~ Beta(n + 1 - l, l), l = ceil((n + 1)(1 - alpha)). Per-context values: `results/stats_coverage_draws.csv`. Medians over the 18 contexts:
+For each context the calibration flows are re-drawn at random from the 120 benign validation flows (200 seeded draws), the correction and the conformal threshold are rebuilt, and the FPR is measured on the FIXED test block. Per context: mean FPR over draws, SD over draws, share of draws with FPR <= alpha + 0.02. Theory: split conformal with n exchangeable calibration scores has true FPR ~ Beta(n + 1 - l, l), l = ceil((n + 1)(1 - alpha)). Per-context values: `results/stats_coverage_draws.csv`. Medians over the contexts (profiles):
 
 | detector | variant | n_thr | mean_fpr | sd_fpr | theory_mean | theory_sd | share_draws_ok | theory_share | contexts_valid | contexts_tight |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -17,11 +17,11 @@ For each context the calibration flows are re-drawn at random from the 120 benig
 | rf | split k=60 | 30 | 0.000 | 0.000 | 0.032 | 0.031 | 1.000 | 0.887 | 1.000 | 0.000 |
 | rf | v0 k=100 | 100 | 0.000 | 0.000 | 0.050 | 0.021 | 1.000 | 0.837 | 1.000 | 0.000 |
 
-**Why the earlier 'alpha inside the flow-bootstrap CI' metric understates calibration randomness.** That bootstrap resamples test flows while the calibration draw, and therefore the threshold, stays fixed: it measures only test-sampling noise around the FPR of ONE threshold. A valid conformal procedure does not make that one realised threshold hit alpha; the realised FPR itself varies from draw to draw (SD in the table), and for n = 50 the mean is also below alpha (1/(n+1)-type slack). So 'alpha outside the CI' happens often even for a valid procedure, and 'alpha inside the CI' can happen by chance for an invalid one. The earlier table is kept below for reference.
+**Why the earlier 'alpha inside the flow-bootstrap CI' metric understates calibration randomness.** That bootstrap resamples test flows while the calibration draw, and therefore the threshold, stays fixed: it measures only test-sampling noise around the FPR of ONE threshold. A valid conformal procedure does not make that one realised threshold hit alpha; the realised FPR itself varies from draw to draw (SD in the table), and for a small n the mean is also below alpha (1/(n+1)-type slack). So 'alpha outside the CI' happens often even for a valid procedure, and 'alpha inside the CI' can happen by chance for an invalid one. The earlier table is kept below for reference.
 
 **Why the empirical SD over draws is below the theoretical SD.** The draws are subsets of the SAME 120 benign validation flows (sampling without replacement from a finite pool; k = 100 or 120 of 120 overlap almost completely, and for k = 120 only the split into fit/threshold halves changes). Re-drawing from a fixed pool therefore captures much less variation than collecting NEW calibration flows would, which is what the Beta spread describes. The measured SD is a lower bound on the real calibration randomness, not an estimate of it; the 'share of draws ok' column is correspondingly optimistic. RF has FPR 0 in every draw (tied scores), so its SD is 0 and it is valid but vacuous (mean FPR far below the 0.05 target).
 
-**Exchangeability.** Calibration flows come from the validation block and test flows from the later test block of the same pcap; the time-blocked split therefore slightly violates exchangeability (drift inside a capture), so the theory is an approximation. Also the test block is fixed, so the SD over draws excludes test-sampling noise (binomial SD about 0.014 at 240 benign flows).
+**Exchangeability.** Calibration flows come from the validation block and test flows from the later test block of the same pcap; the time-blocked split therefore slightly violates exchangeability (drift inside a capture), so the theory is an approximation. Also the test block is fixed, so the SD over draws excludes test-sampling noise (the binomial sampling noise of the benign test flows, which is a separate source of variation).
 
 Reference: earlier flow-bootstrap coverage table (`results/canon_coverage.csv`, AE and RF):
 
@@ -305,14 +305,14 @@ Status rules were fixed before the first run (constants `CLAIM_*` in the script)
 | CANON-B split k=120 has marginal conformal validity (FPR <= alpha+0.02 in >= 80% of calibration draws) | results/stats_coverage_draws.csv | share of contexts valid (pass >= 0.90, partial >= 0.50), PASS capped to PARTIAL if not tight | PARTIAL | rf: valid contexts 1.00, tight contexts 0.00, median SD 0.000 vs theory 0.027; ae: valid contexts 0.78, tight contexts 0.83, median SD 0.013 vs theory 0.027 |
 | CANON-B has significantly lower FPR ranks than naive (Friedman/Nemenyi) | results/stats_nemenyi_pairs.csv | Nemenyi, 17 profiles as blocks (not independent), share of the 2 B variants significantly better than naive | PASS | rf: 2/2 variants beat naive by > CD=2.55; ae: 2/2 variants beat naive by > CD=2.55 |
 | CANON-B is not significantly worse than the oracle (absence of evidence, NOT equivalence) | results/stats_nemenyi_pairs.csv | Nemenyi, share of the 2 B variants not significantly worse than oracle | PASS | rf: 0/2 variants worse than oracle by > CD; ae: 0/2 variants worse than oracle by > CD |
-| Per profile, CANON-B (split k=120) raises fewer false alarms than naive on the same benign flows (McNemar, Holm) | results/stats_mcnemar.csv | share of 18 profiles with Holm p < 0.05 and fewer flags under CANON-B (model seed 11) | PARTIAL | rf: 13/18 profiles; ae: 17/18 profiles |
+| Per profile, CANON-B (split k=120) raises fewer false alarms than naive on the same benign flows (McNemar, Holm) | results/stats_mcnemar.csv | share of profiles with Holm p < 0.05 and fewer flags under CANON-B (model seed 11) | PARTIAL | rf: 13/18 profiles; ae: 17/18 profiles |
 | Benign-only/supervised detectors detect both attack types in-domain | results/detector_attack_type_tpr.csv | share of 3 detectors whose classical in-domain TPR is >= 0.5 for BOTH handshake_flood and slow_send (pass 1.0, partial 0.5) | PARTIAL | rf: yes; ae: yes; iforest: no |
 | Flow-level bootstrap CIs capture capture-to-capture (pcap-level) variability | results/stats_pcap_level.csv | share of (profile, detector, method) cells where SD across 4 capture sets <= flow-bootstrap SE (pass >= 0.90, partial >= 0.50) | PARTIAL | 0.50 of 96 cells not understated |
 | CANON results replicate on the independent replicate captures (CANON fitted on the main run only) | results/canon_confirmation.csv | share of (profile, detector, method, metric in fpr/tpr_all/auroc) cells with overlapping main/replicate CIs (pass >= 0.90, partial >= 0.75) | PASS | 532/576 cells overlap |
 
 ## Caveats
 
-- Scripted workloads, one machine, one cipher suite, 18 profiles are 18 doses and not independent samples.
+- Scripted workloads, one machine, one cipher suite; the profiles are doses and not independent samples.
 - Profiles are not independent blocks (shared reference run), so Friedman/Nemenyi p-values are descriptive.
 - Absence of a significant difference (CANON-B vs oracle) is not equivalence.
 - McNemar uses one model seed and treats test flows within a pcap as independent.

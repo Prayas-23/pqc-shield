@@ -1,4 +1,4 @@
-"""Tests for pqdl.loaders. Fixtures are tiny files written here; the only test that touches
+"""Tests for pqdl.loaders. Fixtures are tiny SYNTHETIC files written here (toy rows shaped like the real schemas, never real data); the only test that touches
 the real data is marked `realdata` (run with `pytest -m realdata`)."""
 
 from __future__ import annotations
