@@ -1,67 +1,64 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApi } from "./lib/api";
 import type { Meta } from "./lib/types";
-import { Header } from "./components/Header";
-import { Source, Status } from "./components/Common";
-import { LadderScreen } from "./components/Ladder";
-import { DriftScreen } from "./components/Drift";
-import { DetectorsScreen } from "./components/Detectors";
-import { ReplayScreen } from "./components/Replay";
+import { Rail, StatusBar, TopBar, VIEWS } from "./components/Shell";
+import type { ViewId } from "./components/Shell";
+import { Msg, Source } from "./components/Common";
+import { LadderView } from "./components/Ladder";
+import { DriftView } from "./components/Drift";
+import { DetectorsView } from "./components/Detectors";
+import { ReplayView } from "./components/Replay";
 
-const SCREENS = [
-  ["ladder", "Handshake sizes"],
-  ["drift", "Feature drift"],
-  ["detectors", "Detectors and mixed traffic"],
-  ["replay", "Replay"],
-  ["caveats", "Caveats"],
-] as const;
-type ScreenId = (typeof SCREENS)[number][0];
-
-const fromHash = (): ScreenId => {
+const fromHash = (): ViewId => {
   const h = window.location.hash.replace("#", "");
-  return (SCREENS.find(([id]) => id === h)?.[0] ?? "ladder") as ScreenId;
+  return (VIEWS.find(([id]) => id === h)?.[0] ?? "ladder") as ViewId;
 };
 
 export default function App() {
   const meta = useApi<Meta>("/api/meta");
   const m = meta.data;
-  const [screen, setScreen] = useState<ScreenId>(fromHash);
+  const [view, setView] = useState<ViewId>(fromHash);
+  const go = useCallback((v: ViewId) => { window.location.hash = v; setView(v); }, []);
+
   useEffect(() => {
-    const on = () => setScreen(fromHash());
-    window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
-  }, []);
+    const onHash = () => setView(fromHash());
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && ["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const i = Number(e.key);
+      if (Number.isInteger(i) && i >= 1 && i <= VIEWS.length) go(VIEWS[i - 1]![0]);
+    };
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("hashchange", onHash); window.removeEventListener("keydown", onKey); };
+  }, [go]);
+
   return (
-    <>
-      <Header meta={meta} />
-      <div className="page">
-        <nav className="rail" aria-label="screens">
-          <ol>
-            {SCREENS.map(([id, text], i) => (
-              <li key={id}><span className="no">{i + 1}</span>
-                {screen === id ? <b>{text}</b> : <a href={`#${id}`}>{text}</a>}
-              </li>
-            ))}
-          </ol>
-          <p>Read-only view of the stored lab results. Nothing on this page starts a capture, runs a command or writes a file.</p>
-        </nav>
-        <main>
-          <Status loading={meta.loading} error={meta.error} what="/api/meta" />
-          {m && screen === "ladder" ? <LadderScreen meta={m} /> : null}
-          {m && screen === "drift" ? <DriftScreen /> : null}
-          {m && screen === "detectors" ? <DetectorsScreen meta={m} /> : null}
-          {m && screen === "replay" ? <ReplayScreen meta={m} /> : null}
-          {m && screen === "caveats" ? (
-            <section className="sec" id="caveats">
-              <h2><span className="no">5</span>Caveats</h2>
-              <ul style={{ maxWidth: "46rem", paddingLeft: "1.1rem" }}>
-                {m.caveats.map((c) => <li key={c}>{c}</li>)}
-              </ul>
-              <Source prov={m.provenance} />
-            </section>
+    <div className="app">
+      <TopBar meta={meta} />
+      <div className="mid">
+        <Rail view={view} onPick={go} />
+        <main style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {meta.error || meta.loading ? <div style={{ padding: "0.8rem" }}><Msg loading={meta.loading} error={meta.error} what="/api/meta" /></div> : null}
+          {m && view === "ladder" ? <LadderView meta={m} /> : null}
+          {m && view === "drift" ? <DriftView /> : null}
+          {m && view === "detectors" ? <DetectorsView meta={m} /> : null}
+          {m && view === "replay" ? <ReplayView meta={m} /> : null}
+          {m && view === "caveats" ? (
+            <div className="view" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
+              <section className="workspace" style={{ borderRight: 0 }} aria-label="Caveats">
+                <div className="strip"><b>Caveats</b></div>
+                <div className="wbody plain">
+                  <ul>{m.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
+                  <Source prov={m.provenance} />
+                </div>
+              </section>
+            </div>
           ) : null}
         </main>
       </div>
-    </>
+      <StatusBar meta={meta} onCaveats={() => go("caveats")} />
+    </div>
   );
 }

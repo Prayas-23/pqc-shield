@@ -1,7 +1,7 @@
 // SYNTHETIC fixtures only: the numbers below are invented to check the arithmetic of the mappers, never quoted anywhere.
 import { describe, expect, it } from "vitest";
 import {
-  caveatTags, cellKey, driftMatrix, fprBars, heatSummary, labelRow, intensity, ladderDelta, metricsForView, mixLines, parseProfile,
+  caveatTags, cellKey, driftMatrix, fprBars, heatSummary, labelRow, shortFeature, shortProfile, intensity, ladderDelta, metricsForView, mixLines, parseProfile,
   profileOptions, rate, replayCounters, sequenceSteps,
 } from "./mappers";
 import { fmtBytes, fmtInt, fmtPct, fmtSigned, shortSha } from "./format";
@@ -152,5 +152,17 @@ describe("label row", () => {
     expect(labelRow(rows, ["naive", "oracle"])).toBe(1);
     expect(labelRow(rows.slice(0, 1), ["naive", "oracle"])).toBe(0);
     expect(labelRow([], ["naive"])).toBe(0);
+  });
+});
+
+describe("short labels", () => {
+  it("makes readable profile labels and drops the view prefix of a feature", () => {
+    expect(shortProfile("X25519MLKEM768|mldsa65|leaf_int")).toBe("X25519+MLKEM768 / MLDSA65 / leaf_int");
+    expect(shortProfile("mlkem768|ecdsa_p256|leaf")).toBe("MLKEM768 / ECDSA-P256 / leaf");
+    expect(shortProfile("X25519|mldsa44|leaf_int")).toBe("X25519 / MLDSA44 / leaf_int");
+    expect(shortFeature("flow_c2s_bytes")).toBe("c2s_bytes");
+    expect(shortFeature("app_s2c_size_3")).toBe("s2c_size_3");
+    expect(shortFeature("hs_duration")).toBe("duration");
+    expect(shortFeature("plain")).toBe("plain");
   });
 });

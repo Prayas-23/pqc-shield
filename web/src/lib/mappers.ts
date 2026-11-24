@@ -158,3 +158,14 @@ export function labelRow(rows: BarRow[], keys: string[]): number {
   const i = rows.findIndex((r) => keys.every((k) => typeof r[k] === "number" && (r[k] as number) > 0));
   return i >= 0 ? i : Math.max(rows.length - 1, 0);
 }
+
+// ------------------------------------------------------------------ short labels (full names stay in the hover text)
+/** "X25519MLKEM768|mldsa65|leaf_int" -> "X25519+MLKEM768 / MLDSA65 / leaf_int". */
+export function shortProfile(p: string): string {
+  const { kem, auth, chain } = parseProfile(p);
+  const k = kem.replace(/^x25519mlkem/i, "X25519+MLKEM").replace(/^mlkem/i, "MLKEM").replace(/^x25519$/i, "X25519");
+  return `${k} / ${auth.toUpperCase().replace(/_/g, "-")} / ${chain}`;
+}
+
+/** "flow_c2s_bytes" -> "c2s_bytes": the view prefix is already named by the selector. */
+export const shortFeature = (f: string): string => f.replace(/^(flow|app|hs)_/, "");

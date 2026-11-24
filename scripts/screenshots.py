@@ -66,21 +66,28 @@ def page_ws() -> str:
     raise SystemExit("could not reach Chrome DevTools")
 
 
-def shoot(cdp: Cdp, url: str, width: int, height: int, wait: float, path: Path, full: bool, script: str = "") -> None:
+LAYOUT_CHECK = """(() => { const out = []; document.querySelectorAll('.wbody,.pane,.pbody,.heatwrap,.ladder,.seqwrap,.view,.workspace,.cols2,.panes2,.help,.top,.status').forEach(e => {
+  if (e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1) out.push(e.className.split(' ')[0] + ' content ' + e.scrollWidth + 'x' + e.scrollHeight + ' in box ' + e.clientWidth + 'x' + e.clientHeight); });
+  const d = document.documentElement; out.unshift('page ' + d.scrollWidth + 'x' + d.scrollHeight + ' in window ' + innerWidth + 'x' + innerHeight); return out.join(' | '); })()"""
+
+
+def shoot(cdp: Cdp, url: str, width: int, height: int, wait: float, path: Path, script: str = "") -> None:
     cdp.call("Emulation.setDeviceMetricsOverride", width=width, height=height, deviceScaleFactor=1, mobile=width < 600)
+    cdp.call("Page.navigate", url="about:blank")
     cdp.call("Page.navigate", url=BASE + url)
     time.sleep(wait)
-    if script:                                    # e.g. click a toggle, then wait for the page to react
+    if script:                                    # e.g. pick a select value or click a toggle, then wait for the page to react
         cdp.call("Runtime.evaluate", expression=script)
         time.sleep(2)
-    cdp.call("Runtime.evaluate", expression="window.scrollTo(0, 0)")
-    if full:
-        h = cdp.call("Runtime.evaluate", expression="Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)")["result"]["value"]
-        cdp.call("Emulation.setDeviceMetricsOverride", width=width, height=int(h), deviceScaleFactor=1, mobile=width < 600)
-        time.sleep(0.5)
+    report = cdp.call("Runtime.evaluate", expression=LAYOUT_CHECK)["result"]["value"]
     data = cdp.call("Page.captureScreenshot", format="png")["data"]
     path.write_bytes(base64.b64decode(data))
-    print("wrote", path.relative_to(ROOT))
+    print("wrote", path.relative_to(ROOT), "|", report)
+
+
+SET_APP_VIEW = """(() => { const s = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.value === 'app'));
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'app'); s.dispatchEvent(new Event('change', {bubbles: true})); })()"""
+OPEN_HELP = "document.querySelector('.strip button').click()"
 
 
 def main() -> int:
@@ -89,13 +96,12 @@ def main() -> int:
     try:
         cdp = Cdp(page_ws())
         cdp.call("Page.enable")
-        shoot(cdp, "/#ladder", 1280, 800, 3, OUT / "1-ladder-measured-overhead-1280-full.png", full=True,
-              script="document.querySelector('input[type=checkbox]').click()")
         for stem, url, wait in SCREENS:
-            shoot(cdp, url, 1280, 800, wait, OUT / f"{stem}-1280x800.png", full=False)
-            shoot(cdp, url, 1280, 800, wait, OUT / f"{stem}-1280-full.png", full=True)
-            shoot(cdp, url, 390, 844, wait, OUT / f"{stem}-phone-390x844.png", full=False)
-            shoot(cdp, url, 390, 844, wait, OUT / f"{stem}-phone-390-full.png", full=True)
+            shoot(cdp, url, 1280, 800, wait, OUT / f"{stem}-1280x800.png")
+            shoot(cdp, url, 390, 844, wait, OUT / f"{stem}-phone-390x844.png")
+        shoot(cdp, "/#ladder", 1280, 800, 3, OUT / "1-ladder-measured-overhead-1280x800.png", script="document.querySelector('input[type=checkbox]').click()")
+        shoot(cdp, "/#drift", 1280, 800, 4, OUT / "2-drift-application-view-1280x800.png", script=SET_APP_VIEW)
+        shoot(cdp, "/#detectors", 1280, 800, 6, OUT / "3-detectors-help-open-1280x800.png", script=OPEN_HELP)
     finally:
         chrome.terminate()
     return 0

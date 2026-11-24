@@ -11,3 +11,6 @@ export const fmtNum = (x: number | null | undefined, digits = 3): string => (ok(
 export const fmtP = (x: number | null | undefined): string => (ok(x) ? (x < 0.001 ? "< 0.001" : x.toFixed(3)) : NA);
 export const shortSha = (s: string): string =>
   /^[0-9a-f]{12,}(-dirty)?$/.test(s) ? s.slice(0, 8) + (s.endsWith("-dirty") ? "-dirty" : "") : s;
+
+/** Short label for the results commit: "mixed" when the source files disagree (the hover text lists each file). */
+export const commitLabel = (c: string): string => (c.startsWith("mixed") ? "mixed" : shortSha(c));
