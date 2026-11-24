@@ -310,9 +310,9 @@ def claims_table(base, cres, cov_s, fr, mc, pc, dose, conf_base, conf_canon, att
         m = mc[(mc.detector == d) & (mc.b_variant == "split k=120") & (mc.comparison == "naive vs CANON-B") & (mc.flows == "benign")]
         sig_ = (m.p_holm < 0.05) & (m.only_first_flags > m.only_second_flags)
         sts.append(st.status_from_share(float(sig_.mean()), P, PP))
-        txt.append(f"{d}: {int(sig_.sum())}/18 profiles")
+        txt.append(f"{d}: {int(sig_.sum())}/{len(m)} profiles")
     add("Per profile, CANON-B (split k=120) raises fewer false alarms than naive on the same benign flows (McNemar, Holm)",
-        "results/stats_mcnemar.csv", "share of 18 profiles with Holm p < 0.05 and fewer flags under CANON-B (model seed 11)", sts, "; ".join(txt))
+        "results/stats_mcnemar.csv", "share of profiles with Holm p < 0.05 and fewer flags under CANON-B (model seed 11)", sts, "; ".join(txt))
     # C13 attacks detected in-domain
     ok = {d: float(att[att.detector == d]["classical_in_domain"].min() >= 0.5) for d in dt.DETECTORS}
     add("Benign-only/supervised detectors detect both attack types in-domain", "results/detector_attack_type_tpr.csv",
@@ -350,12 +350,12 @@ def write_notes(cov_s, fr, diffs, mc, pc, claims, old_cov, n_draws, cal) -> str:
          f"({n_draws} seeded draws), the correction and the conformal threshold are rebuilt, and the FPR is measured on the FIXED "
          "test block. Per context: mean FPR over draws, SD over draws, share of draws with FPR <= alpha + 0.02. "
          "Theory: split conformal with n exchangeable calibration scores has true FPR ~ Beta(n + 1 - l, l), l = "
-         "ceil((n + 1)(1 - alpha)). Per-context values: `results/stats_coverage_draws.csv`. Medians over the 18 contexts:", "",
+         "ceil((n + 1)(1 - alpha)). Per-context values: `results/stats_coverage_draws.csv`. Medians over the contexts (profiles):", "",
          md_table(cov_s), "",
          "**Why the earlier 'alpha inside the flow-bootstrap CI' metric understates calibration randomness.** That bootstrap "
          "resamples test flows while the calibration draw, and therefore the threshold, stays fixed: it measures only "
          "test-sampling noise around the FPR of ONE threshold. A valid conformal procedure does not make that one realised "
-         "threshold hit alpha; the realised FPR itself varies from draw to draw (SD in the table), and for n = 50 the mean is "
+         "threshold hit alpha; the realised FPR itself varies from draw to draw (SD in the table), and for a small n the mean is "
          "also below alpha (1/(n+1)-type slack). So 'alpha outside the CI' happens often even for a valid procedure, "
          "and 'alpha inside the CI' can happen by chance for an invalid one. The earlier table is kept below for reference.", "",
          "**Why the empirical SD over draws is below the theoretical SD.** The draws are subsets of the SAME 120 benign "
@@ -368,7 +368,7 @@ def write_notes(cov_s, fr, diffs, mc, pc, claims, old_cov, n_draws, cal) -> str:
          "**Exchangeability.** Calibration flows come from the validation block and test flows from the later test block "
          "of the same pcap; the time-blocked split therefore slightly violates exchangeability (drift inside a capture), "
          "so the theory is an approximation. Also the test block is fixed, so the SD over draws excludes test-sampling "
-         "noise (binomial SD about 0.014 at 240 benign flows).", "",
+         "noise (the binomial sampling noise of the benign test flows, which is a separate source of variation).", "",
          "Reference: earlier flow-bootstrap coverage table (`results/canon_coverage.csv`, AE and RF):", "", md_table(old_cov), "",
          "## 3. Friedman + Nemenyi (17 non-classical profiles as blocks, FPR, lower is better)", "",
          "**The 17 profiles are not independent blocks**: they share one reference run, one machine, and several differ only in "
@@ -411,7 +411,7 @@ def write_notes(cov_s, fr, diffs, mc, pc, claims, old_cov, n_draws, cal) -> str:
           "Status rules were fixed before the first run (constants `CLAIM_*` in the script). PASS / PARTIAL / FAIL is "
           "computed, not judged by hand. Do not claim beyond the evidence column.", "", md_table(claims), "",
           "## Caveats", "",
-          "- Scripted workloads, one machine, one cipher suite, 18 profiles are 18 doses and not independent samples.",
+          "- Scripted workloads, one machine, one cipher suite; the profiles are doses and not independent samples.",
           "- Profiles are not independent blocks (shared reference run), so Friedman/Nemenyi p-values are descriptive.",
           "- Absence of a significant difference (CANON-B vs oracle) is not equivalence.",
           "- McNemar uses one model seed and treats test flows within a pcap as independent.",
@@ -440,7 +440,7 @@ def main(argv: list[str]) -> int:
     cov.to_csv(RES / "stats_coverage_draws.csv", index=False)
     cov_s = coverage_summary(cov)
     cov_s.to_csv(RES / "stats_coverage_summary.csv", index=False)
-    show(f"2. marginal coverage over {n_draws} calibration draws: medians over the 18 contexts", cov_s)
+    show(f"2. marginal coverage over {n_draws} calibration draws: medians over the contexts", cov_s)
     print(f"   ({time.time() - t0:.0f} s)", flush=True)
 
     fr, diffs, pairs = friedman_section(base, cres)

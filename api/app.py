@@ -31,7 +31,7 @@ CAVEATS = [
     "Local network: no real RTT, loss or congestion; timing features are lab timings.",
     "Scripted workloads: the 'attacks' (handshake_flood, slow_send) are scripted attack-like workloads, not real attacks.",
     "One cipher suite (TLS_AES_256_GCM_SHA384); profiles differ only in key exchange, signature algorithm and chain length.",
-    "The 18 profiles are 18 'doses', not independent samples; splits are time-blocked inside one pcap per profile and workload.",
+    "The profiles are 'doses', not independent samples; splits are time-blocked inside one pcap per profile and workload.",
     "IsolationForest misses handshake floods even in-domain; treat its results as a weak baseline.",
 ]
 # detector_baseline.csv / canon_eval.csv method name -> label used in results/stats_pcap_level.csv

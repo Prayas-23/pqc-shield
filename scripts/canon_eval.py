@@ -222,7 +222,7 @@ def notes(cmp_: pd.DataFrame, cov: pd.DataFrame, acc: dict[str, float], per_main
           f"{dt.FIT_LOG.ae_not_converged}/{dt.FIT_LOG.ae_fits}.", "",
           "CANON-B AUROC is computed on the margin (score minus the per-context threshold). With k=10 the conformal "
           "threshold is +inf (rank 11 > 10), so nothing is flagged: FPR = TPR = 0 and AUROC = 0.5 by construction.", "",
-          "## Conformal coverage of CANON-B (FPR per context vs alpha = 0.05, main test blocks)", "",
+          f"## Conformal coverage of CANON-B (FPR per context vs alpha = {canon.ALPHA}, main test blocks)", "",
           "| detector | method | median FPR | mean abs deviation | contexts with alpha in 95% CI |", "|---|---|---|---|---|"]
     for r in cov.itertuples():
         L.append(f"| {r.detector} | {r.method} | {r.median_fpr:.3f} | {r.mean_abs_dev:.3f} | {r.contexts_alpha_in_ci}/{r.n_contexts} |")
@@ -231,10 +231,10 @@ def notes(cmp_: pd.DataFrame, cov: pd.DataFrame, acc: dict[str, float], per_main
           f"- CIs overlap in {int(a.ci_overlap.sum())}/{len(a)} (profile, detector, method, metric) cells (fpr, tpr_all, auroc); "
           f"largest absolute difference {a.abs_diff.max():.3f}.", "",
           "## Caveats", "",
-          "- Scripted workloads, one machine, one cipher suite, 18 profiles = 18 'doses'; time-blocked splits inside one pcap.",
+          "- Scripted workloads, one machine, one cipher suite; the profiles are 'doses'; time-blocked splits inside one pcap.",
           "- The context estimator needs labelled flows of every context, so 'zero PQ training data' holds for the CANON-A "
           "correction rule only; the TRUE-context variants isolate that.",
-          "- CANON-A uses default size-model overheads; byte deltas are off by ~34 B for leaf_int and 170-370 B for leaf profiles.",
+          "- CANON-A uses default size-model overheads; the resulting error of the modelled byte differences is in `docs/canon_attribution.md`.",
           "- CANON-B uses the same k flows for the shift and for tau (mildly optimistic) and corrects bytes only.",
           "- Bootstrap CIs resample flows and ignore pcap-level variance."]
     return "\n".join(L) + "\n"
@@ -282,13 +282,13 @@ def main(argv: list[str]) -> int:
     cmp_["method"] = pd.Categorical(cmp_["method"], order)
     show("median over the 17 non-classical profiles (main run); canon_a2 = EXPLORATORY post-hoc, canon_bs = post-hoc split",
          cmp_.sort_values(["detector", "method"]))
-    show("CANON-B conformal coverage (summary over the 18 contexts): FPR vs alpha = 0.05", cov)
+    show("CANON-B conformal coverage (summary over the contexts): FPR vs alpha", cov)
     pc = per_context_coverage(res)
     pc.to_csv(out / "canon_coverage_per_context.csv", index=False)
     for det in ("ae", "rf"):
         t = pc[pc.detector == det].pivot_table(index="profile", columns="method", values="cell", aggfunc="first")
         show(f"{det}: FPR per context [95% CI] on the test block, '*' = alpha 0.05 outside the CI "
-             "(true and c-hat contexts are identical: c-hat accuracy is 100%)", t.reset_index())
+             f"(true and c-hat contexts coincide when c-hat accuracy is 1; here {acc_main:.3f} on the main test blocks)", t.reset_index())
     show("AE before/after max_iter 500 -> 2000 (median over the 17 non-classical profiles)",
          ae_before_after(Path(argv[argv.index("--before") + 1]) if "--before" in argv else None, base, res))
     print(f"AE fits in this script (naive domains) not converged at max_iter={dt.AE_MAX_ITER}: "
