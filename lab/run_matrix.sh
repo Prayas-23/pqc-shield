@@ -35,6 +35,15 @@ done
 utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 log() { echo "$(utc) $*"; }
 
+# The version of the code that produced a capture: `git rev-parse HEAD`, with "-dirty" appended when there are
+# uncommitted changes (tracked or untracked, ignoring .gitignore'd files). "unknown" if this is not a git repo or
+# has no commit yet. Evaluated at the start of every pcap, so a change made mid-run is visible in the manifest.
+code_version() {
+  local sha
+  sha="$(git rev-parse HEAD 2>/dev/null)" || { echo unknown; return; }
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then echo "${sha}-dirty"; else echo "$sha"; fi
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   for d in "$LOCALAPPDATA/Programs/DockerDesktop/resources/bin" "/c/Program Files/Docker/Docker/resources/bin"; do
     if [ -x "$d/docker.exe" ] || [ -x "$d/docker" ]; then PATH="$PATH:$d"; break; fi
@@ -46,7 +55,7 @@ PY=.venv/Scripts/python; [ -x "$PY" ] || PY=.venv/bin/python
 
 if [ "$MODE" = mini ]; then PCAPS=data/pcaps_mini; else PCAPS=data/pcaps; fi
 MANIFEST=$PCAPS/manifest.csv
-HEADER="kem,auth,chain,workload,label,intended_sessions,observed_connections,seed,openssl_version,start_utc,end_utc,pcap_file,pcap_bytes,tcpdump_dropped,capture_offload_ok,max_tcp_payload"
+HEADER="kem,auth,chain,workload,label,intended_sessions,observed_connections,seed,openssl_version,start_utc,end_utc,pcap_file,pcap_bytes,tcpdump_dropped,capture_offload_ok,max_tcp_payload,code_commit"
 mkdir -p "$PCAPS"
 
 # ---- single-instance lock ---------------------------------------------------------------------
@@ -102,8 +111,9 @@ wait_for_log() { # SERVICE PATTERN WHAT : poll a container's own log (generates 
 has_row() { grep -q ",$1.pcap," "$MANIFEST"; }
 
 _run_one() { # KEM AUTH CHAIN WORKLOAD ; returns non-zero on any problem (caller cleans up and may retry)
-  local kem="$1" auth="$2" chain="$3" wl="$4" n label name pcap part start end rc=0 dropped
+  local kem="$1" auth="$2" chain="$3" wl="$4" n label name pcap part start end rc=0 dropped code_commit
   n="$(n_for "$wl")"; label="$(workload_label "$wl")" || return 1
+  code_commit="$(code_version)"
   name="${kem}_${auth}_${chain}_${wl}"; pcap="$PCAPS/$name.pcap"; part="$pcap.part"
   export KEM="$kem" AUTH="$auth" CHAIN="$chain" PCAP_NAME="$name.pcap"
   start="$(utc)"
@@ -131,7 +141,7 @@ _run_one() { # KEM AUTH CHAIN WORKLOAD ; returns non-zero on any problem (caller
   if [ "$ok_server" = 1 ] && [ "$ok_client" = 1 ] && [ "$maxpl" -le "$MAX_OFFLOAD_PAYLOAD" ]; then offload_ok=true; else offload_ok=false; fi
   bytes="$(stat -c %s "$part")"
   grep -v ",$name.pcap," "$MANIFEST" > "$MANIFEST.tmp" || true; mv "$MANIFEST.tmp" "$MANIFEST"   # idempotent row
-  echo "$kem,$auth,$chain,$wl,$label,$n,$obs,$SEED,$OPENSSL_VERSION,$start,$end,$name.pcap,$bytes,$dropped,$offload_ok,$maxpl" >> "$MANIFEST"
+  echo "$kem,$auth,$chain,$wl,$label,$n,$obs,$SEED,$OPENSSL_VERSION,$start,$end,$name.pcap,$bytes,$dropped,$offload_ok,$maxpl,$code_commit" >> "$MANIFEST"
   mv "$part" "$pcap"
   log "done   $name  conns=$obs/$n  bytes=$bytes  max_payload=$maxpl  offload_ok=$offload_ok  $(tail -1 "$PCAPS/$name.workload.log")"
 }
