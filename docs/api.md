@@ -37,7 +37,7 @@ Needs the stored files produced by the pipeline scripts: `data/flows/lab_flows.c
 
 | Route | Parameters | Returns |
 |---|---|---|
-| `GET /api/meta` | none | `version`, `served_by_commit`, `profiles` (18 lab profiles `kem\|auth\|chain`), `methods` (baseline, canon, stream), `detectors`, `caveats` |
+| `GET /api/meta` | none | `version`, `served_by_commit`, `profiles` (18 lab profiles `kem\|auth\|chain`), `methods` (baseline, canon, stream), `detectors`, `caveats`, `classical_profile`, `design_fpr` (the 5 % operating point), `ci_level` (level of the bootstrap intervals) |
 | `GET /api/ladder` | `kem`, `auth`, `chain` (required) | `model.ladder` = `handshake_ladder()` at `LAB_MSS = 1448`, `model.B_S/B_C`, `observed` (median `hs_s2c_bytes`/`hs_c2s_bytes`, `n_flows`), `comparison` (observed, model, difference, % of observed). 404 for an unknown profile |
 | `GET /api/drift` | `workload`, `view` (`hs`\|`app`\|`flow`), `limit`, `offset` | rows of `lab_drift.csv`: `eta2`, `partial_eta2`, `psi`, `mmd2`, `mmd2_p_value`, with the noise floors `noise95_eta2`, `noise95_max_psi` |
 | `GET /api/detectors` | `detector` (`rf`\|`ae`\|`iforest`), `method`, `profile`, `dataset` (default `main`), `metric`, `limit` | one record per (dataset, detector, method, profile) with `metrics{fpr,tpr_all,tpr_*,auroc,...}` each `{value, ci_lo, ci_hi, seed_sd}`; `pcap_level` (mean FPR and SD across the 4 capture sets, min, max, whether the flow CI understates) only where it exists (4 replicated profiles, 8 methods) |

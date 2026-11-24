@@ -87,6 +87,7 @@ def build(tmp_path: Path, eager_train: bool = False) -> ApiConfig:
     pd.DataFrame([{"detector": "rf", "profile": P1, "method": "naive", "n_capture_sets": 4, "mean_fpr": 0.88,
                    "sd_across_pcaps": 0.02, "min": 0.85, "max": 0.91, "main_fpr": 0.9, "flow_ci_lo": 0.89, "flow_ci_hi": 0.91,
                    "flow_se": 0.005, "sd_over_flow_se": 4.0, "flow_ci_understates": True}]).to_csv(results / "stats_pcap_level.csv", index=False)
+    pd.DataFrame([{"auth": "ecdsa_p256", "o_cert": 405.0}, {"auth": "mldsa65", "o_cert": 392.0}]).to_csv(results / "cert_overhead.csv", index=False)
     flows_path = root / "SYNTHETIC_lab_flows.csv"
     make_flows().to_csv(flows_path, index=False)
     return ApiConfig(results_dir=results, flows_path=flows_path, root=root, synthetic=True, eager_train=eager_train)

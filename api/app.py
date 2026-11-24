@@ -23,6 +23,7 @@ from api.store import DataStore, MissingData, records
 from pqdl import canon
 from pqdl import detectors as dt
 from pqdl.handshake import LAB_MSS, client_flight_bytes, handshake_ladder, server_flight_bytes
+from pqdl.profiles import Overheads
 
 Detector = Literal["rf", "ae", "iforest"]
 CAVEATS = [
@@ -44,6 +45,8 @@ PQMIX_FORMULA = ("FPR_mix(pi) = pi * FPR_profile + (1 - pi) * FPR_classical, usi
                  "on the chosen PQ profile and on the classical profile. A weighted average of two measurements, "
                  "not a simulation; the CIs of the two components are given, none is invented for the mix.")
 BASE_CSV, CANON_CSV, PCAP_CSV, DRIFT_CSV = "detector_baseline.csv", "canon_eval.csv", "stats_pcap_level.csv", "lab_drift.csv"
+CERT_CSV = "cert_overhead.csv"
+CI_LEVEL = 0.95        # level of the flow-bootstrap intervals in the results files (detectors.summarise: 2.5 % and 97.5 % quantiles)
 
 
 def create_app(cfg: ApiConfig | None = None) -> FastAPI:
@@ -80,12 +83,13 @@ def create_app(cfg: ApiConfig | None = None) -> FastAPI:
                     "profiles": store.profile_strings(),
                     "methods": {"baseline": sorted(base["method"].unique()), "canon": sorted(can["method"].unique()),
                                 "stream": list(STREAM_METHODS)},
-                    "detectors": list(dt.DETECTORS), "caveats": CAVEATS},
+                    "detectors": list(dt.DETECTORS), "caveats": CAVEATS,
+                    "classical_profile": canon.CLASSICAL_CONTEXT, "design_fpr": dt.DESIGN_FPR, "ci_level": CI_LEVEL},
                    [store.path(BASE_CSV), store.path(CANON_CSV), cfg.flows_path])
 
     # ------------------------------------------------------------------ /api/ladder
     @app.get("/api/ladder")
-    def ladder(kem: str, auth: str, chain: str) -> dict:
+    def ladder(kem: str, auth: str, chain: str, cert_overhead: Literal["default", "measured"] = "default") -> dict:
         ctx = f"{kem}|{auth}|{chain}"
         try:
             prof = canon.context_profile(ctx)
@@ -94,19 +98,30 @@ def create_app(cfg: ApiConfig | None = None) -> FastAPI:
         obs = store.observed_handshake(kem, auth, chain)
         if obs is None:
             raise HTTPException(404, f"no lab flows for profile {ctx}")
-        model_s, model_c = server_flight_bytes(prof), client_flight_bytes(prof)
+        files = [cfg.flows_path]
+        ov = Overheads()
+        if cert_overhead == "measured":                      # per-certificate overhead measured on the lab's own certificates
+            table = store.csv(CERT_CSV).set_index("auth")
+            if auth not in table.index:
+                raise HTTPException(404, f"no measured certificate overhead for auth {auth}")
+            ov = Overheads(o_cert=int(round(float(table.loc[auth, "o_cert"]))))
+            files.append(store.path(CERT_CSV))
+        model_s, model_c = server_flight_bytes(prof, ov), client_flight_bytes(prof, ov)
 
         def diff(o: float, m: int) -> dict:
             return {"observed": o, "model": m, "difference": o - m,
                     "difference_pct_of_observed": 100.0 * (o - m) / o if o else None}
 
         return out({"profile": ctx, "mss": LAB_MSS,
-                    "model": {"ladder": handshake_ladder(prof, mss=LAB_MSS), "B_S": model_s, "B_C": model_c,
-                              "note": "size model with default overheads (VERIFY); not tuned to the lab"},
+                    "model": {"ladder": handshake_ladder(prof, mss=LAB_MSS, ov=ov), "B_S": model_s, "B_C": model_c,
+                              "cert_overhead": cert_overhead, "o_cert_bytes": ov.o_cert,
+                              "note": ("size model with the per-certificate overhead measured on the lab's own certificates"
+                                       if cert_overhead == "measured" else
+                                       "size model with default overheads (VERIFY); not tuned to the lab")},
                     "observed": obs,
                     "comparison": {"server_to_client_bytes": diff(obs["hs_s2c_bytes_median"], model_s),
                                    "client_to_server_bytes": diff(obs["hs_c2s_bytes_median"], model_c)}},
-                   [cfg.flows_path])
+                   files)
 
     # ------------------------------------------------------------------ /api/drift
     @app.get("/api/drift")

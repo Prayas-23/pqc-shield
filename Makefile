@@ -6,7 +6,7 @@ else
   PY_BOOT ?= python3
 endif
 
-.PHONY: setup test api
+.PHONY: setup test api web
 
 setup:
 	$(PY_BOOT) -m venv .venv
@@ -19,3 +19,6 @@ test:
 
 api:
 	$(BIN)/python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+
+web:
+	cd web && npm run dev

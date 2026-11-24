@@ -295,3 +295,22 @@ def test_served_by_commit_is_head_of_the_served_repo(tmp_path):
     (git / "refs" / "heads" / "main").write_text("cafe1234")
     p = TestClient(create_app(cfg)).get("/api/drift").json()["provenance"]
     assert p["served_by_commit"] == "cafe1234" and p["results_code_commit"] == "unknown (generated before tracking)"
+
+
+def test_meta_gives_classical_profile_and_design_fpr(client):
+    b = client.get("/api/meta").json()
+    assert b["classical_profile"] == fx.P0 and b["design_fpr"] == 0.05 and b["ci_level"] == 0.95
+
+
+def test_ladder_measured_certificate_overhead(client):
+    params = {"kem": "mlkem768", "auth": "mldsa65", "chain": "leaf_int"}
+    d = client.get("/api/ladder", params=params).json()
+    m = client.get("/api/ladder", params={**params, "cert_overhead": "measured"}).json()
+    check_provenance(m, True)
+    assert d["model"]["cert_overhead"] == "default" and d["model"]["o_cert_bytes"] == 40
+    assert m["model"]["cert_overhead"] == "measured" and m["model"]["o_cert_bytes"] == 392
+    assert m["model"]["B_S"] - d["model"]["B_S"] == 2 * (392 - 40)               # 2 certificates in leaf_int
+    assert m["model"]["B_C"] == d["model"]["B_C"]
+    assert "cert_overhead.csv" in " ".join(m["provenance"]["source_files"])
+    assert "cert_overhead.csv" not in " ".join(d["provenance"]["source_files"])
+    assert client.get("/api/ladder", params={**params, "cert_overhead": "bogus"}).status_code == 422

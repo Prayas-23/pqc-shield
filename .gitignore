@@ -11,3 +11,4 @@ results/*.meta.json
 .pytest_cache/
 lab/run.*
 lab/.run.lock/
+dist/
